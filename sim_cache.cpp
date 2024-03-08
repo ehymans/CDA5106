@@ -25,7 +25,8 @@ public:
     CacheLine() : tag(-1), dirty(false) {}
 };
 
-class CacheSet {
+class CacheSet 
+{
 public:
     vector<CacheLine> lines;
     vector<long long> lru_position;
@@ -73,6 +74,7 @@ private:
     vector<CacheSet> sets;
     unsigned long long num_sets;
     unsigned int assoc;
+    unsigned int block_size;
     unsigned int replacement_policy;
     unsigned int write_back_policy;
 
@@ -82,9 +84,9 @@ private:
     unsigned long long writes_count = 0;
 
 public:
-    Cache(unsigned int size, unsigned int assoc, unsigned int replacement, unsigned int write_back) : 
-        assoc(assoc), replacement_policy(replacement), write_back_policy(write_back) {
-        num_sets = size / (64 * assoc);             // need to change from 64 to use block_size in int main()
+    Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int write_back) : 
+        assoc(assoc), block_size(block_size), replacement_policy(replacement), write_back_policy(write_back) {
+        num_sets = size / (block_size * assoc); // Use block_size here
         sets.resize(num_sets, CacheSet(assoc));
     }
 
@@ -96,13 +98,14 @@ public:
     void allocate_block(int set_index, long long tag);
     void evict_block(int set_index, int block_index);
     
-    void print_statistics() {
+    void print_statistics() 
+    {
         cout << "Miss rate: " << static_cast<float>(miss_count) / (hit_count + miss_count) * 100 << "%\n";
         cout << "Write operations: " << writes_count << "\n";
         cout << "Read operations: " << reads_count << "\n";
     }
 
-/*
+    /*
     void simulate_access(char op, long long address) 
     {
         // Determine set and tag from address
@@ -128,8 +131,9 @@ public:
 bool Cache::simulate_access(char op, long long address) 
 {
     // this is going to need to be adjusted based on the implementation that we do
-    int set_index = (address >> 6) % num_sets; // Assuming 64-byte cache lines --> CHANGE THIS LATER
-    long long tag = address >> (6 + static_cast<int>(log2(num_sets)));
+    int log_block_size = static_cast<int>(log2(block_size));
+    int set_index = (address >> log_block_size) % num_sets;
+    long long tag = address >> (log_block_size + static_cast<int>(log2(num_sets)));
 
     // Search for the tag in the set
     for (int i = 0; i < assoc; i++) {
@@ -155,10 +159,10 @@ private:
     string trace_file;
 public:
     // constructor to initialize both L1 and L2 caches
-    Simulation(unsigned int L1_size, unsigned int L1_assoc, unsigned int L2_size, unsigned int L2_assoc, unsigned int replacement, unsigned int write_back, const string& trace_file) :
-        L1_cache(L1_size, L1_assoc, replacement, write_back), 
-        L2_cache(L2_size, L2_assoc, replacement, write_back), //initialize L2 cache
-        trace_file(trace_file) {} 
+    Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc, unsigned int L2_size, unsigned int L2_assoc, unsigned int replacement, unsigned int write_back, const string& trace_file) :
+        L1_cache(L1_size, L1_assoc, block_size, replacement, write_back), 
+        L2_cache(L2_size, L2_assoc, block_size, replacement, write_back), // Pass block_size here
+        trace_file(trace_file) {}
 
     void run() {
         ifstream inp(trace_file);
@@ -205,7 +209,7 @@ int main(int argc, char* argv[]) {
     string trace_file = argv[8];
 
     
-    Simulation sim(L1_size, L1_assoc, L2_size, L2_assoc, replacement_policy, write_back_policy, trace_file);
+    Simulation sim(block_size, L1_size, L1_assoc, L2_size, L2_assoc, replacement_policy, write_back_policy, trace_file);
     sim.run();
 
     return 0;
