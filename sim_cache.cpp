@@ -1,7 +1,7 @@
 /*
 Ethan Hymans
-<Name>
-<Name>
+Daniel Solis
+Kyle Shervington
 <Name>
 <Name>
 CDA5106 - Advanced Computer Architecture
@@ -76,7 +76,7 @@ private:
     unsigned int assoc;
     unsigned int block_size;
     unsigned int replacement_policy;
-    unsigned int write_back_policy;
+    unsigned int inclusion_policy;
 
     unsigned long long hit_count = 0;
     unsigned long long miss_count = 0;
@@ -84,8 +84,8 @@ private:
     unsigned long long writes_count = 0;
 
 public:
-    Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int write_back) : 
-        assoc(assoc), block_size(block_size), replacement_policy(replacement), write_back_policy(write_back) {
+    Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : 
+        assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion) {
         num_sets = size / (block_size * assoc); // Use block_size here
         sets.resize(num_sets, CacheSet(assoc));
     }
@@ -152,16 +152,17 @@ bool Cache::simulate_access(char op, long long address)
     return false; // Miss
 }
 
-class Simulation {
+class Simulation 
+{
 private:
     Cache L1_cache;
     Cache L2_cache; 
     string trace_file;
 public:
     // constructor to initialize both L1 and L2 caches
-    Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc, unsigned int L2_size, unsigned int L2_assoc, unsigned int replacement, unsigned int write_back, const string& trace_file) :
-        L1_cache(L1_size, L1_assoc, block_size, replacement, write_back), 
-        L2_cache(L2_size, L2_assoc, block_size, replacement, write_back), // Pass block_size here
+    Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc, unsigned int L2_size, unsigned int L2_assoc, unsigned int replacement, unsigned int inclusion, const string& trace_file) :
+        L1_cache(L1_size, L1_assoc, block_size, replacement, inclusion), 
+        L2_cache(L2_size, L2_assoc, block_size, replacement, inclusion), // Pass block_size here
         trace_file(trace_file) {}
 
     void run() {
@@ -192,7 +193,8 @@ public:
 /*////////////////////////////////////////////////
 ********************* MAIN **********************
 ///////////////////////////////////////////////*/
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) 
+{
     if (argc != 8) {
         cerr << "Usage: <BLOCKSIZE> <L1_SIZE> <L1_ASSOC> <L2_SIZE> <L2_ASSOC> <REPLACEMENT_POLICY> <INCLUSION_POLICY> <TRACE_FILE>\n";
         return 1;
@@ -205,11 +207,11 @@ int main(int argc, char* argv[]) {
     unsigned int L2_size = stoi(argv[4]);
     unsigned int L2_assoc = stoi(argv[5]);
     unsigned int replacement_policy = stoi(argv[6]);
-    unsigned int write_back_policy = stoi(argv[7]);
+    unsigned int inclusion_policy = stoi(argv[7]);
     string trace_file = argv[8];
 
     
-    Simulation sim(block_size, L1_size, L1_assoc, L2_size, L2_assoc, replacement_policy, write_back_policy, trace_file);
+    Simulation sim(block_size, L1_size, L1_assoc, L2_size, L2_assoc, replacement_policy, inclusion_policy, trace_file);
     sim.run();
 
     return 0;
