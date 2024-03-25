@@ -188,7 +188,7 @@ public:
         if (op == 'r') 
         {
             reads_count++;
-            cout << "Read counter Incremented: " << reads_count << "\n";
+            //cout << "Read counter Incremented: " << reads_count << "\n";
         } 
         else if (op == 'w') 
         {
