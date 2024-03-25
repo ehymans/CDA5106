@@ -232,15 +232,15 @@ public:
     {
         // Updated to print additional required statistics
         unsigned long long accesses = reads_count + writes_count;
-        //float miss_rate = accesses > 0 ? static_cast<float>(read_misses + write_misses) / accesses : 0;
+        float miss_rate = accesses > 0 ? static_cast<float>(read_misses + write_misses) / accesses : 0;
         
         cout << "Read operations: " << reads_count << "\n";
         cout << "Read Misses: " << read_misses << "\n";
         cout << "Write operations: " << writes_count << "\n";
         cout << "Write Misses: " << write_misses << "\n";
         cout << "Writebacks: " << writebacks << "\n";
-        //cout << "Miss Rate: " << fixed << setprecision(2) << (accesses > 0 ? miss_rate * 100 : 0) << "%\n";
-        cout << "Miss rate: " << static_cast<float>(miss_count) / (hit_count + miss_count) * 100 << "%\n";
+        cout << "Miss Rate: " << fixed << setprecision(2) << (accesses > 0 ? miss_rate * 100 : 0) << "%\n";
+        //cout << "Miss rate: " << static_cast<float>(miss_count) / (hit_count + miss_count) * 100 << "%\n";
     }
 
 
