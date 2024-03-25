@@ -39,9 +39,9 @@ public:
         }
     }
 
-    void replace_block_lru(long long tag);
-    void replace_block_fifo(long long tag);
-    void replace_block_optimal(long long tag, const vector<long long>& future_references);
+    //void replace_block_lru(long long tag);
+    //void replace_block_fifo(long long tag);
+    //void replace_block_optimal(long long tag, const vector<long long>& future_references);
 
 
     // methods will need to be adapted to fit our paper implementation
@@ -69,7 +69,8 @@ public:
     }
 };
 
-class Cache {
+class Cache 
+{
 private:
     vector<CacheSet> sets;
     unsigned long long num_sets;
@@ -95,7 +96,7 @@ public:
     bool simulate_access(char op, long long address);
     void update_lru(int set, int index);
     void update_fifo(int set, int index);
-    void allocate_block(int set_index, long long tag);
+    void allocate_block(int set_index, long long tag, char op);
     void evict_block(int set_index, int block_index);
     
     void print_statistics() 
@@ -104,33 +105,65 @@ public:
         cout << "Write operations: " << writes_count << "\n";
         cout << "Read operations: " << reads_count << "\n";
     }
-
-    /*
-    void simulate_access(char op, long long address) 
-    {
-        // Determine set and tag from address
-        // Check for hit or miss
-        // On write miss or read miss, allocate block (considering WBWA)        
-        // Update state (LRU/FIFO/Optimal counters, valid and dirty bits)
-    }*/
-
-    void allocate_block(int set_index, long long tag) 
-    {
-        // Check if there is space, if not find a victim block to evict based on replacement policy
-        // If victim block is dirty, issue a writeback
-        // Bring in the requested block
-    }
-
-    void evict_block(int set_index, int block_index) 
-    {
-        // If inclusive, invalidate corresponding block in L1 (if exists)
-        // Issue writeback if dirty
-    }
 };
+
+void Cache::evict_block(int set_index, int block_index) 
+{
+    // Assuming non-inclusive cache, thus not checking L1
+    if (sets[set_index].lines[block_index].dirty) {
+        writes_count++; // Increment write back count
+    }
+    // Reset the block
+    sets[set_index].lines[block_index].tag = -1;
+    sets[set_index].lines[block_index].dirty = false;
+}
+
+void Cache::update_lru(int set_index, int index) 
+{
+    // Move the accessed block to the most recently used position
+    long long lru_tag = sets[set_index].lru_position[index];
+    sets[set_index].lru_position.erase(sets[set_index].lru_position.begin() + index);
+    sets[set_index].lru_position.push_back(lru_tag);
+}
+
+void Cache::allocate_block(int set_index, long long tag, char op) 
+{
+    bool foundEmptyLine = false;
+    for (int i = 0; i < assoc; ++i) 
+    {
+        if (sets[set_index].lines[i].tag == -1) 
+        { // Empty line found
+            sets[set_index].lines[i].tag = tag;
+            if (op == 'W') 
+            {
+                sets[set_index].lines[i].dirty = true; // Mark as dirty if it's a write operation
+            }
+            update_lru(set_index, i); // Update LRU since it's a new entry
+            foundEmptyLine = true;
+            break;
+        }
+    }
+
+    if (!foundEmptyLine)
+    {
+        // Evict a block if no empty line is found
+        int lru_index = distance(sets[set_index].lru_position.begin(), max_element(sets[set_index].lru_position.begin(), sets[set_index].lru_position.end()));
+        if (sets[set_index].lines[lru_index].dirty) 
+        {
+            writes_count++; // Increment write back count if dirty
+        }
+
+        sets[set_index].lines[lru_index].tag = tag;
+        sets[set_index].lines[lru_index].dirty = (op == 'W'); // Set dirty based on operation
+        update_lru(set_index, lru_index);
+
+    }
+}
+
+
 
 bool Cache::simulate_access(char op, long long address) 
 {
-    // this is going to need to be adjusted based on the implementation that we do
     int log_block_size = static_cast<int>(log2(block_size));
     int set_index = (address >> log_block_size) % num_sets;
     long long tag = address >> (log_block_size + static_cast<int>(log2(num_sets)));
@@ -140,17 +173,23 @@ bool Cache::simulate_access(char op, long long address)
         if (sets[set_index].lines[i].tag == tag) {
             // Hit
             if (op == 'W') {
-                sets[set_index].lines[i].dirty = true;
+                sets[set_index].lines[i].dirty = true; // Mark as dirty if write operation
             }
             update_lru(set_index, i); // Update LRU if using LRU policy
+            hit_count++; // Increment hit count
             return true; // Hit
         }
     }
 
-    // Miss: Allocate block
-    allocate_block(set_index, tag);
+    // Miss: Allocate block with the operation type
+    allocate_block(set_index, tag, op);
+    miss_count++; // Increment miss count
+    if (op == 'R') {
+        reads_count++;
+    }
     return false; // Miss
 }
+
 
 class Simulation 
 {
@@ -184,7 +223,9 @@ public:
         }
 
         inp.close();
+        cout << "L1 Cache Statistics\n";
         L1_cache.print_statistics();    // L1 stats
+        cout << "L2 Cache Statistics\n";
         L2_cache.print_statistics();    // L2 stats
     }
 };
@@ -195,8 +236,17 @@ public:
 ///////////////////////////////////////////////*/
 int main(int argc, char* argv[]) 
 {
-    if (argc != 8) {
+    /* 8KB 4-way set-associative L1 cache with 32B block size, 256KB 8-way set-associative L2
+    * cache with 32B block size, LRU replacement, non-inclusive cache (default), gcc trace:
+    * 
+    * ./sim_cache 32 8192 4 262144 8 0 0 gcc_trace.txt
+    * 
+    */
+
+    if (argc != 9) 
+    {
         cerr << "Usage: <BLOCKSIZE> <L1_SIZE> <L1_ASSOC> <L2_SIZE> <L2_ASSOC> <REPLACEMENT_POLICY> <INCLUSION_POLICY> <TRACE_FILE>\n";
+
         return 1;
     }
 
