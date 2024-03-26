@@ -8,6 +8,21 @@ CDA5106 - Advanced Computer Architecture
 Machine Problem 1: Cache Design, Memory Hierarchy Design
 */
 
+/*
+TO-DO LIST:
+  1) For debug5.txt, L2 output statistics are incorrect. The # of reads/writes is lower than what is expected. The expected results are at the end of debug5.txt.
+  2) FIFO & Optimal Replacement Polciies
+        - FIFO might involve using a queue of block index's
+  3) Handling INCLUSIVE Cache. 
+  4) Moving from L1 to L2 cache has some problems like evicting the block and passing it to L2
+  5) Overall structure, checking the parameters before different actions are done on the cache (LRU, FIFO, evicting, replacing, etc) 
+
+  ...
+*/
+
+
+
+
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -137,7 +152,7 @@ public:
                 sets[set_index].lines[i].tag = tag;
                 if (op == 'w') 
                 {
-                    sets[set_index].lines[i].dirty = true; // Mark as dirty if it's a write operation
+                    sets[set_index].lines[i].dirty = true;  // Mark as dirty if it's a write operation --> this is important for WBWA
                 }
                 update_lru(set_index, i); // Update LRU since it's a new entry
                 foundEmptyLine = true;
@@ -152,11 +167,11 @@ public:
                 
                 // Evict a block if no empty line is found
                 int lru_index = distance(sets[set_index].lru_position.begin(), max_element(sets[set_index].lru_position.begin(), sets[set_index].lru_position.end()));
-                /*
+                
                 if (sets[set_index].lines[lru_index].dirty) 
                 {
-                    writes_count++; // Increment write back count if dirty
-                }*/
+                    writebacks++;
+                }
 
                 sets[set_index].lines[lru_index].tag = tag;
                 sets[set_index].lines[lru_index].dirty = (op == 'w'); // Set dirty based on operation
@@ -164,11 +179,11 @@ public:
             }
             else if(replacement_policy == 1)
             {
-                // call replace_block_fifo here
+                // FIFO
             }
             else if(replacement_policy == 2)
             {
-                // call replace_block_optimal here
+                // OPTIMAL
             }
 
         }
@@ -311,9 +326,9 @@ public:
         L2_cache.print_contents();*/
 
         // Print additional stats
-        cout << "L1 Cache Statistics\n";
+        cout << "\nL1 Cache Statistics\n";
         L1_cache.print_statistics();    // L1 stats
-        cout << "L2 Cache Statistics\n";
+        cout << "\nL2 Cache Statistics\n";
         L2_cache.print_statistics();    // L2 stats
     }
 };
@@ -329,6 +344,7 @@ int main(int argc, char* argv[])
     * 
     * ./sim_cache 32 8192 4 262144 8 0 0 traces/gcc_trace.txt
     * 
+    * debug5.txt comparision testing: ./sim_cache 16 1024 1 8192 4 0 0 traces/go_trace.txt
     */
 
     if (argc != 9) 
