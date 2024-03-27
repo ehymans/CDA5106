@@ -98,7 +98,7 @@ private:
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : 
         assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion) {
-        num_sets = size / (block_size * assoc); // Use block_size here
+        num_sets = size == 0 ? 0 : size / (block_size * assoc); // Use block_size here
         sets.resize(num_sets, CacheSet(assoc));
     }
 
