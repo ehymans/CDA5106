@@ -76,7 +76,29 @@ public:
 
     void replace_block_optimal(long long tag, const vector<long long>& future_references) 
     {
-        // gotta figure this one out 
+        // replace the block that would be used furthest into the future
+        long long blockToReplace;
+        int highestFutureIndex = -1;
+        for (int i = 0; i < lines.size(); i++){
+            //search future_references for current block
+            t = INT_MAX;
+            for (int j = 0; j < future_references.size(); j++){
+                if (future_references[j] == lines[i].tag){
+                    t = j;
+                    break;
+                }
+            }
+
+            if (t > highestFutureIndex){
+                highestFutureIndex = t;
+                blockToReplace = i;
+            }
+            if (highestFutureIndex == INT_MAX){
+                break;
+            }
+        }
+
+        lines[blockToReplace].tag = tag;
     }
 };
 
@@ -140,6 +162,28 @@ public:
     }
 
     ////////////////////////////////////////////////
+    ////////////// UPDATE_LRU //////////////////////
+    ////////////////////////////////////////////////
+    void update_next_use(){
+        // decrement next use by 1 for all blocks except newly inserted block
+        // if 0 reset to next OR -1 indicated never used again
+        // (because we can safely dec and check < 0 for checks)
+
+        for (map<long long, int>::iterator ptr = next_use_index.begin()
+                ptr < next_use_index.end(); ptr++){
+            ptr->second--;
+            if (ptr->second == 0){
+                for (int j = 0; j < future_references.size(); j++){
+                    if (future_references[j] == ptr->second){
+                        ptr->second = j;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    ////////////////////////////////////////////////
     ////////////// ALLOCATE_BLOCK //////////////////
     ////////////////////////////////////////////////
     void allocate_block(int set_index, long long tag, char op) 
@@ -183,7 +227,28 @@ public:
             }
             else if(replacement_policy == 2)
             {
-                // OPTIMAL
+                // Optimal
+                int optimal_index = -1;
+                int highestFutureUse = -1;
+                for (int i = 0; i < sets[set_index].lines.size(); i++){
+                    int nextUse = next_use_index[sets[set_index].lines[i]];
+                    if (nextUse < 0) {
+                        optimal_index = i;
+                        break;
+                    }
+                    if (nextUse > highestFutureUse) {
+                        highestFutureUse = nextUse;
+                        optimal_index = i;
+                    }
+                }
+
+                if (sets[set_index].lines[optimal_index].dirty)
+                {
+                    writebacks++;
+                }
+
+                sets[set_index].lines[optimal_index].tag = tag;
+                sets[set_index].lines[optimal_index].dirty = (op == 'w'); // Set dirty based on operation
             }
 
         }
