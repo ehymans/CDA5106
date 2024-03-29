@@ -21,8 +21,6 @@ TO-DO LIST:
 */
 
 
-
-
 #include <iostream>
 #include <utility>
 #include <vector>
@@ -54,7 +52,8 @@ public:
 
     CacheSet(int assoc) : lines(assoc), lru_position(assoc), fifo_position(assoc, 0) 
     {
-        for(int i = 0; i < assoc; ++i) {
+        for(int i = 0; i < assoc; ++i) 
+        {
             lru_position[i] = i;
         }
     }
@@ -83,6 +82,7 @@ public:
     }
 };
 
+
 class Cache 
 {
 private:
@@ -104,7 +104,7 @@ private:
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : 
         assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion) {
-        num_sets = size == 0 ? 0 : size / (block_size * assoc); // Use block_size here
+        num_sets = size == 0 ? 0 : size / (block_size * assoc); 
         sets.resize(num_sets, CacheSet(assoc));
     }
 
@@ -138,13 +138,17 @@ public:
     ////////////////////////////////////////////////
     ////////////// UPDATE_LRU //////////////////////
     ////////////////////////////////////////////////
-    void update_lru(int set_index, int index) 
+
+    void update_lru(int set_index, int accessed_index) 
     {
         // Move the accessed block to the most recently used position
-        long long lru_tag = sets[set_index].lru_position[index];
-        sets[set_index].lru_position.erase(sets[set_index].lru_position.begin() + index);
-        sets[set_index].lru_position.push_back(lru_tag);
-    }
+        auto accessed_lru = std::find(sets[set_index].lru_position.begin(), sets[set_index].lru_position.end(), accessed_index);
+        if (accessed_lru != sets[set_index].lru_position.end()) 
+        {
+            sets[set_index].lru_position.erase(accessed_lru);
+        }
+        sets[set_index].lru_position.push_back(accessed_index);
+    } 
 
     ////////////////////////////////////////////////
     ////////////// UPDATE_NEXT_USE /////////////////
@@ -202,19 +206,17 @@ public:
     ////////////////////////////////////////////////
     ////////////// ALLOCATE_BLOCK //////////////////
     ////////////////////////////////////////////////
+   
     void allocate_block(int set_index, long long tag, char op) 
     {
-        bool foundEmptyLine = false;
+    bool foundEmptyLine = false;
         for (int i = 0; i < assoc; ++i) 
         {
             if (sets[set_index].lines[i].tag == -1) 
             { // Empty line found
                 sets[set_index].lines[i].tag = tag;
-                if (op == 'w') 
-                {
-                    sets[set_index].lines[i].dirty = true;  // Mark as dirty if it's a write operation --> this is important for WBWA
-                }
-                update_lru(set_index, i); // Update LRU since it's a new entry
+                sets[set_index].lines[i].dirty = (op == 'w'); // Set dirty if it's a write
+                update_lru(set_index, i); // Move to the most recently used position
                 foundEmptyLine = true;
                 break;
             }
@@ -224,9 +226,10 @@ public:
         {
             if(replacement_policy == 0)
             {
-                
-                // Evict a block if no empty line is found
-                int lru_index = distance(sets[set_index].lru_position.begin(), max_element(sets[set_index].lru_position.begin(), sets[set_index].lru_position.end()));
+                // lru replacement policy here
+                int lru_index = distance(sets[set_index].lru_position.begin(), min_element(sets[set_index].lru_position.begin(), sets[set_index].lru_position.end()));
+
+                //evict_block(set_index, lru_index);
                 
                 if (sets[set_index].lines[lru_index].dirty) 
                 {
@@ -304,7 +307,6 @@ public:
     ////////////////////////////////////////////////
     ////////////// SIMULATE_ACCESS /////////////////
     ////////////////////////////////////////////////
-
     bool simulate_access(char op, long long address) 
     {
         int log_block_size = static_cast<int>(log2(block_size));
@@ -325,11 +327,13 @@ public:
         // Search for the tag in the set
         bool hit = false;
         for (int i = 0; i < assoc; i++) {
-            if (sets[set_index].lines[i].tag == tag) {
+            if (sets[set_index].lines[i].tag == tag) 
+            {
                 // Hit found
                 hit = true;
                 hit_count++;
-                if (op == 'w') {
+                if (op == 'w') 
+                {
                     sets[set_index].lines[i].dirty = true;
                 }
                 update_lru(set_index, i);
@@ -337,7 +341,8 @@ public:
             }
         }
 
-        if (!hit) {
+        if (!hit) 
+        {
             // Miss
             miss_count++;
             allocate_block(set_index, tag, op);
@@ -353,7 +358,6 @@ public:
 
         return hit;
     }
-
 
     void print_statistics() 
     {
@@ -377,10 +381,14 @@ public:
         cout << "Final Cache Contents:\n";
         for (unsigned long long i = 0; i < num_sets; ++i) {
             cout << "Set " << i << ":";
-            for (auto& line : sets[i].lines) {
-                cout << " [" << (line.tag == -1 ? "Empty" : to_string(line.tag)) << (line.dirty ? " D" : "") << "]";
+            for (auto& line : sets[i].lines) 
+            {
+                if (line.tag != -1)
+                    cout << " [" << hex << line.tag << (line.dirty ? " D" : "") << "]";
+                else
+                    cout << " [Empty]";
             }
-            cout << "\n";
+            cout << dec << "\n"; // Switch back to decimal for non-hex output
         }
     }
 
@@ -402,26 +410,39 @@ private:
     Cache L2_cache; 
     string trace_file;
     unsigned int replacement_policy;
+    bool isL2Enabled; // Added flag to indicate if L2 is enabled
 public:
     // constructor to initialize both L1 and L2 caches
     Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc, unsigned int L2_size, unsigned int L2_assoc, unsigned int replacement, unsigned int inclusion, const string& trace_file) :
         L1_cache(L1_size, L1_assoc, block_size, replacement, inclusion), 
         L2_cache(L2_size, L2_assoc, block_size, replacement, inclusion), // Pass block_size here
         trace_file(trace_file),
-        replacement_policy(replacement) {}
-
+        replacement_policy(replacement),
+        isL2Enabled(L2_size != 0 && L2_assoc != 0) {} // Initialize L2 enabled status based on size and assoc
 
     void run() 
     {
         cout << "Memory Hierarchy Configuration and Trace Filename:\n";
-        cout << "L1 Cache: " << L1_cache.getNumSets() * L1_cache.getAssoc() * L1_cache.getBlockSize() / 1024 << "KB " 
-            << L1_cache.getAssoc() << "-way, Block size: " << L1_cache.getBlockSize() << "B\n";
-        cout << "L2 Cache: " << L2_cache.getNumSets() * L2_cache.getAssoc() * L2_cache.getBlockSize() / 1024 << "KB " 
-            << L2_cache.getAssoc() << "-way, Block size: " << L2_cache.getBlockSize() << "B\n";
+        cout << "L1 Cache: " << L1_cache.getNumSets() * L1_cache.getAssoc() * L1_cache.getBlockSize() / 1024 
+             << "KB " << L1_cache.getAssoc() << "-way, Block size: " << L1_cache.getBlockSize() << "B\n";
+
+        // Conditionally display L2 cache configuration based on whether it's enabled
+        
+        if (isL2Enabled) 
+        {
+            cout << "L2 Cache: " << L2_cache.getNumSets() * L2_cache.getAssoc() * L2_cache.getBlockSize() / 1024 
+                 << "KB " << L2_cache.getAssoc() << "-way, Block size: " << L2_cache.getBlockSize() << "B\n";
+        } 
+        else 
+        {
+            cout << "L2 Cache: Disabled\n";
+        }
+
         cout << "Trace file: " << trace_file << "\n";
 
         ifstream inp(trace_file);
-        if (!inp) {
+        if (!inp) 
+        {
             cerr << "Error opening trace file\n";
             return;
         }
@@ -465,7 +486,7 @@ public:
         {
             //cout << "Operation: " << op << ", Address: " << address << "\n"; // Debug print
             // First, attempt access in L1 cache
-            if (!L1_cache.simulate_access(itr->op, itr->address))
+            if (!L1_cache.simulate_access(itr->op, itr->address) && isL2Enabled)
             {
                 // If miss in L1, access L2 cache
                 L2_cache.simulate_access(itr->op, itr->address);
@@ -474,24 +495,30 @@ public:
             if (replacement_policy == 2)
             {
                 L1_cache.update_next_use();
-                L2_cache.update_next_use();
+                if (isL2Enabled)
+                {
+                    L2_cache.update_next_use();
+                }
             }
         }
 
         inp.close();
 
-        /*
-        // Print the final contents of all caches
         cout << "L1 Cache Contents:\n";
         L1_cache.print_contents();
-        cout << "L2 Cache Contents:\n";
-        L2_cache.print_contents();*/
 
-        // Print additional stats
+        if (isL2Enabled) {
+            cout << "L2 Cache Contents:\n";
+            L2_cache.print_contents();
+        }
+
         cout << "\nL1 Cache Statistics\n";
         L1_cache.print_statistics();    // L1 stats
-        cout << "\nL2 Cache Statistics\n";
-        L2_cache.print_statistics();    // L2 stats
+
+        if (isL2Enabled) {
+            cout << "\nL2 Cache Statistics\n";
+            L2_cache.print_statistics();    // L2 stats
+        }
     }
 };
 
