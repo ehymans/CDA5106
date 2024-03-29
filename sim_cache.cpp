@@ -24,7 +24,10 @@ TO-DO LIST:
 
 
 #include <iostream>
+#include <utility>
 #include <vector>
+#include <map>
+#include <deque>
 #include <fstream>
 #include <string>
 #include <algorithm>
@@ -77,28 +80,6 @@ public:
     void replace_block_optimal(long long tag, const vector<long long>& future_references) 
     {
         // replace the block that would be used furthest into the future
-        long long blockToReplace;
-        int highestFutureIndex = -1;
-        for (int i = 0; i < lines.size(); i++){
-            //search future_references for current block
-            t = INT_MAX;
-            for (int j = 0; j < future_references.size(); j++){
-                if (future_references[j] == lines[i].tag){
-                    t = j;
-                    break;
-                }
-            }
-
-            if (t > highestFutureIndex){
-                highestFutureIndex = t;
-                blockToReplace = i;
-            }
-            if (highestFutureIndex == INT_MAX){
-                break;
-            }
-        }
-
-        lines[blockToReplace].tag = tag;
     }
 };
 
@@ -117,6 +98,9 @@ private:
     unsigned long long reads_count = 0;
     unsigned long long writes_count = 0;
 
+    //map<long long, vector<int>> next_use_index;
+    deque<long long> accesses;
+
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : 
         assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion) {
@@ -133,6 +117,7 @@ public:
     unsigned long long read_misses = 0;
     unsigned long long write_misses = 0;
     unsigned long long writebacks = 0;
+
 
     ////////////////////////////////////////////////
     ////////////// EVICT_BLOCK /////////////////////
@@ -162,25 +147,56 @@ public:
     }
 
     ////////////////////////////////////////////////
-    ////////////// UPDATE_LRU //////////////////////
+    ////////////// UPDATE_NEXT_USE /////////////////
     ////////////////////////////////////////////////
     void update_next_use(){
         // decrement next use by 1 for all blocks except newly inserted block
         // if 0 reset to next OR -1 indicated never used again
         // (because we can safely dec and check < 0 for checks)
 
-        for (map<long long, int>::iterator ptr = next_use_index.begin()
-                ptr < next_use_index.end(); ptr++){
-            ptr->second--;
-            if (ptr->second == 0){
-                for (int j = 0; j < future_references.size(); j++){
-                    if (future_references[j] == ptr->second){
-                        ptr->second = j;
-                        break;
-                    }
+        /*map<long long, vector<int>>::iterator ptr = next_use_index.begin();
+        while (ptr != next_use_index.end())
+        {
+            vector<int>::iterator vecptr = ptr->second.begin();
+            while (vecptr < ptr->second.end())
+            {
+                //(*vecptr) = (*vecptr) - 1;
+                if ((*vecptr) <= 0){
+                    vecptr = ptr->second.erase(vecptr);
                 }
+                else
+                {
+                    vecptr++;
+                }
+
             }
-        }
+
+            ptr++;
+        }*/
+        accesses.pop_front();
+    }
+
+
+    ////////////////////////////////////////////////
+    ////////////// UPDATE_NEXT_USE /////////////////
+    ////////////////////////////////////////////////
+    void set_next_use(deque<long long> in_accesses){
+        // decrement next use by 1 for all blocks except newly inserted block
+        // if 0 reset to next OR -1 indicated never used again
+        // (because we can safely dec and check < 0 for checks)
+
+        // deep copy of map since the map contains vectors we need to do this manually
+        /*for (map<long long, vector<int>>::iterator ptr = accesses.begin();
+                ptr != accesses.end(); ptr++)
+        {
+            //deep copy
+            vector<int> indexes(ptr->second);
+
+            //new map elem with Key and new vector
+            next_use_index.emplace(ptr->first, indexes);
+        }*/
+
+        accesses = in_accesses;
     }
 
     ////////////////////////////////////////////////
@@ -230,16 +246,47 @@ public:
                 // Optimal
                 int optimal_index = -1;
                 int highestFutureUse = -1;
-                for (int i = 0; i < sets[set_index].lines.size(); i++){
-                    int nextUse = next_use_index[sets[set_index].lines[i]];
-                    if (nextUse < 0) {
+                for (int i = 0; i < assoc; i++){
+                    /*vector<int> nextUse = next_use_index[sets[set_index].lines[i].tag];
+                    if (nextUse.empty()){
                         optimal_index = i;
                         break;
                     }
-                    if (nextUse > highestFutureUse) {
-                        highestFutureUse = nextUse;
-                        optimal_index = i;
+                    int j = 0;
+                    while (nextUse[j] < 1 && j < nextUse.size()) {
+                        j++;
                     }
+                    if (j >= nextUse.size()){
+                        optimal_index = i;
+                        break;
+                    }
+                    if (nextUse[j] > highestFutureUse) {
+                        highestFutureUse = nextUse[j];
+                        optimal_index = i;
+                    }*/
+                    bool found = false;
+                    for (int j = 0; j < accesses.size(); j++){
+                        if (accesses[j] == sets[set_index].lines[i].tag)
+                        {
+                            if (j > highestFutureUse)
+                            {
+                                highestFutureUse = j;
+                                optimal_index = i;
+                            }
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        optimal_index = i;
+                        break;
+                    }
+                }
+
+                if (optimal_index == -1){
+                    // problem
+                    optimal_index = 0;
                 }
 
                 if (sets[set_index].lines[optimal_index].dirty)
@@ -339,18 +386,29 @@ public:
 
 };
 
+struct  Operation {
+    int op;
+    long long address;
+    Operation (int in_op, long long in_address){
+        op = in_op;
+        address = in_address;
+    }
+};
+
 class Simulation 
 {
 private:
     Cache L1_cache;
     Cache L2_cache; 
     string trace_file;
+    unsigned int replacement_policy;
 public:
     // constructor to initialize both L1 and L2 caches
     Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc, unsigned int L2_size, unsigned int L2_assoc, unsigned int replacement, unsigned int inclusion, const string& trace_file) :
         L1_cache(L1_size, L1_assoc, block_size, replacement, inclusion), 
         L2_cache(L2_size, L2_assoc, block_size, replacement, inclusion), // Pass block_size here
-        trace_file(trace_file) {}
+        trace_file(trace_file),
+        replacement_policy(replacement) {}
 
 
     void run() 
@@ -370,14 +428,53 @@ public:
 
         char op;
         long long address;
-        while (inp >> op >> hex >> address) 
+        //map<long long, vector<int>> accesses;
+        deque<long long> accesses;
+
+        //int count = 0;
+        vector<Operation> lines;
+        // preprocessing step required for optimal replacement
+        while (inp >> op >> hex >> address)
+        {
+            Operation line(op,address);
+
+            accesses.push_back(address);
+
+            /*map<long long, vector<int>>::iterator elem = accesses.find(address);
+
+            // check if elem was found
+            if(elem != accesses.end())
+            {
+                elem->second.push_back(count);
+            }
+            else
+            {
+                vector<int> v({count});
+                accesses.emplace(address, v);
+            }*/
+
+            lines.push_back(line);
+            //count++;
+        }
+
+        L1_cache.set_next_use(accesses);
+        L2_cache.set_next_use(accesses);
+
+        for (vector<Operation>::iterator itr = lines.begin();
+                itr < lines.end(); itr++)
         {
             //cout << "Operation: " << op << ", Address: " << address << "\n"; // Debug print
             // First, attempt access in L1 cache
-            if (!L1_cache.simulate_access(op, address)) 
+            if (!L1_cache.simulate_access(itr->op, itr->address))
             {
                 // If miss in L1, access L2 cache
-                L2_cache.simulate_access(op, address);
+                L2_cache.simulate_access(itr->op, itr->address);
+            }
+
+            if (replacement_policy == 2)
+            {
+                L1_cache.update_next_use();
+                L2_cache.update_next_use();
             }
         }
 
@@ -397,7 +494,6 @@ public:
         L2_cache.print_statistics();    // L2 stats
     }
 };
-
 
 /*////////////////////////////////////////////////
 ********************* MAIN **********************
