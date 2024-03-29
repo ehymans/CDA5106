@@ -21,8 +21,6 @@ TO-DO LIST:
 */
 
 
-
-
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -51,7 +49,8 @@ public:
 
     CacheSet(int assoc) : lines(assoc), lru_position(assoc), fifo_position(assoc, 0) 
     {
-        for(int i = 0; i < assoc; ++i) {
+        for(int i = 0; i < assoc; ++i) 
+        {
             lru_position[i] = i;
         }
     }
@@ -80,6 +79,7 @@ public:
     }
 };
 
+
 class Cache 
 {
 private:
@@ -98,7 +98,7 @@ private:
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : 
         assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion) {
-        num_sets = size == 0 ? 0 : size / (block_size * assoc); // Use block_size here
+        num_sets = size == 0 ? 0 : size / (block_size * assoc); 
         sets.resize(num_sets, CacheSet(assoc));
     }
 
@@ -131,6 +131,7 @@ public:
     ////////////////////////////////////////////////
     ////////////// UPDATE_LRU //////////////////////
     ////////////////////////////////////////////////
+
     void update_lru(int set_index, int accessed_index) 
     {
         // Move the accessed block to the most recently used position
@@ -140,11 +141,12 @@ public:
             sets[set_index].lru_position.erase(accessed_lru);
         }
         sets[set_index].lru_position.push_back(accessed_index);
-    }
+    } 
 
     ////////////////////////////////////////////////
     ////////////// ALLOCATE_BLOCK //////////////////
     ////////////////////////////////////////////////
+   
     void allocate_block(int set_index, long long tag, char op) 
     {
     bool foundEmptyLine = false;
@@ -164,10 +166,11 @@ public:
         {
             if(replacement_policy == 0)
             {
-                
-            // Correct LRU replacement
-            int lru_index = distance(sets[set_index].lru_position.begin(), min_element(sets[set_index].lru_position.begin(), sets[set_index].lru_position.end()));
+                // lru replacement policy here
+                int lru_index = distance(sets[set_index].lru_position.begin(), min_element(sets[set_index].lru_position.begin(), sets[set_index].lru_position.end()));
 
+                //evict_block(set_index, lru_index);
+                
                 if (sets[set_index].lines[lru_index].dirty) 
                 {
                     writebacks++;
@@ -192,7 +195,6 @@ public:
     ////////////////////////////////////////////////
     ////////////// SIMULATE_ACCESS /////////////////
     ////////////////////////////////////////////////
-
     bool simulate_access(char op, long long address) 
     {
         int log_block_size = static_cast<int>(log2(block_size));
@@ -213,11 +215,13 @@ public:
         // Search for the tag in the set
         bool hit = false;
         for (int i = 0; i < assoc; i++) {
-            if (sets[set_index].lines[i].tag == tag) {
+            if (sets[set_index].lines[i].tag == tag) 
+            {
                 // Hit found
                 hit = true;
                 hit_count++;
-                if (op == 'w') {
+                if (op == 'w') 
+                {
                     sets[set_index].lines[i].dirty = true;
                 }
                 update_lru(set_index, i);
@@ -225,7 +229,8 @@ public:
             }
         }
 
-        if (!hit) {
+        if (!hit) 
+        {
             // Miss
             miss_count++;
             allocate_block(set_index, tag, op);
@@ -241,7 +246,6 @@ public:
 
         return hit;
     }
-
 
     void print_statistics() 
     {
@@ -265,7 +269,8 @@ public:
         cout << "Final Cache Contents:\n";
         for (unsigned long long i = 0; i < num_sets; ++i) {
             cout << "Set " << i << ":";
-            for (auto& line : sets[i].lines) {
+            for (auto& line : sets[i].lines) 
+            {
                 if (line.tag != -1)
                     cout << " [" << hex << line.tag << (line.dirty ? " D" : "") << "]";
                 else
@@ -303,10 +308,14 @@ public:
              << "KB " << L1_cache.getAssoc() << "-way, Block size: " << L1_cache.getBlockSize() << "B\n";
 
         // Conditionally display L2 cache configuration based on whether it's enabled
-        if (isL2Enabled) {
+        
+        if (isL2Enabled) 
+        {
             cout << "L2 Cache: " << L2_cache.getNumSets() * L2_cache.getAssoc() * L2_cache.getBlockSize() / 1024 
                  << "KB " << L2_cache.getAssoc() << "-way, Block size: " << L2_cache.getBlockSize() << "B\n";
-        } else {
+        } 
+        else 
+        {
             cout << "L2 Cache: Disabled\n";
         }
 
@@ -325,7 +334,7 @@ public:
         {
             if (!L1_cache.simulate_access(op, address) && isL2Enabled) 
             {
-                // If miss in L1 and L2 is enabled, access L2 cache
+                // If miss in L1 AND L2 is enabled, access L2 cache
                 L2_cache.simulate_access(op, address);
             }
         }
