@@ -28,6 +28,7 @@ TO-DO LIST:
 #include <cmath>
 #include <iomanip>
 #include <unordered_map>
+#include <queue>
 
 using namespace std;
 
@@ -44,9 +45,9 @@ class CacheSet
 public:
     vector<CacheLine> lines;
     vector<long long> lru_position;
-    vector<int> fifo_position; // this may need to be changed from an int
+    queue<int> fifo_position;
 
-    CacheSet(int assoc) : lines(assoc), lru_position(assoc), fifo_position(assoc, 0)
+    CacheSet(int assoc) : lines(assoc), lru_position(assoc)
     {
         for (int i = 0; i < assoc; ++i)
         {
@@ -59,16 +60,6 @@ public:
         // LRU implementation: Find least recently used block and replace it with new tag
         int lru_index = distance(lru_position.begin(), min_element(lru_position.begin(), lru_position.end()));
         lines[lru_index].tag = tag;
-        // need to include dirty bit handling
-    }
-
-    void replace_block_fifo(long long tag)
-    {
-        // FIFO implementation: Replace the oldest block
-        int fifo_index = fifo_position.front();
-        fifo_position.erase(fifo_position.begin()); // Remove the oldest block's index
-        fifo_position.push_back(fifo_index);        // Add it back to signify it's the newest
-        lines[fifo_index].tag = tag;
         // need to include dirty bit handling
     }
 
@@ -142,12 +133,11 @@ public:
     ////////////////////////////////////////////////
     void update_fifo(int set_index, int index)
     {
-        long long fifo_tag = sets[set_index].fifo_position[index];
-        int fifo_index = sets[set_index].fifo_position.front();
+        // remove first element in queue
+        sets[set_index].fifo_position.pop();
 
-        sets[set_index].fifo_position.erase(sets[set_index].fifo_position.begin()); // Remove the oldest block's index
-        sets[set_index].fifo_position.push_back(fifo_index);                        // Add it back to signify it's the newest
-        sets[set_index].lines[fifo_index].tag = fifo_tag;
+        // Place previous element at the back
+        sets[set_index].fifo_position.push(index);
     }
 
     ////////////////////////////////////////////////
@@ -165,7 +155,9 @@ public:
                 {
                     sets[set_index].lines[i].dirty = true; // Mark as dirty if it's a write operation --> this is important for WBWA
                 }
-                update_lru(set_index, i); // Update LRU since it's a new entry
+                update_lru(set_index, i);              // Update LRU since it's a new entry
+                sets[set_index].fifo_position.push(i); // Add index to fifo queue
+
                 foundEmptyLine = true;
                 break;
             }
@@ -191,15 +183,21 @@ public:
             else if (replacement_policy == 1)
             {
                 // FIFO
+
+                // get index of first element in queue
                 int fifo_index = sets[set_index].fifo_position.front();
 
+                // If that line to be replaced is dirty, increment writeback
                 if (sets[set_index].lines[fifo_index].dirty)
                 {
                     writebacks++;
                 }
 
+                // Perform tag replacement
                 sets[set_index].lines[fifo_index].tag = tag;
                 sets[set_index].lines[fifo_index].dirty = (op == 'w');
+
+                // Move index from front of queue to the back
                 update_fifo(set_index, fifo_index);
             }
             else if (replacement_policy == 2)
@@ -382,7 +380,7 @@ int main(int argc, char *argv[])
      */
 
     //  FIFO testing
-    // debug2.txt: ./sim_cache 16 1024 2 0 0 1 0 traces/gcc_trace.txt
+    // validation2.txt: ./sim_cache 16 1024 2 0 0 1 0 traces/gcc_trace.txt
 
     if (argc != 9)
     {
