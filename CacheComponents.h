@@ -3,9 +3,10 @@
 
 #include <vector>
 #include <algorithm>
+#include <queue>
 
 // CacheLine class definition
-class CacheLine 
+class CacheLine
 {
 public:
     long long tag;
@@ -14,16 +15,17 @@ public:
 };
 
 // CacheSet class definition
-class CacheSet 
+class CacheSet
 {
 public:
     std::vector<CacheLine> lines;
     std::vector<long long> lru_position;
-    std::vector<int> fifo_position; // this may need to be changed from an int
+    std::queue<int> fifo_position; // this may need to be changed from an int
 
-    CacheSet(int assoc) : lines(assoc), lru_position(assoc), fifo_position(assoc, 0) 
+    CacheSet(int assoc) : lines(assoc), lru_position(assoc)
     {
-        for(int i = 0; i < assoc; ++i) {
+        for (int i = 0; i < assoc; ++i)
+        {
             lru_position[i] = i;
         }
     }
