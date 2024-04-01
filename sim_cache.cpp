@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 1. .\sim_cache 16 1024 1 0 0 0 0 traces/perl_trace.txt          PASS
 2. .\sim_cache 16 1024 2 0 0 1 0 traces/gcc_trace.txt           PASS
 3. .\sim_cache 16 1024 2 0 0 2 0 traces/vortex_trace.txt        FAIL
-4. .\sim_cache 16 1024 2 8192 4 0 0 traces/gcc_trace.txt        FAIL
+4. .\sim_cache 16 1024 2 8192 4 0 0 traces/gcc_trace.txt        PASS
 5. .\sim_cache 16 1024 1 8192 4 0 0 traces/go_trace.txt         PASS
 6. .\sim_cache 16 1024 2 8192 4 0 1 traces/gcc_trace.txt        FAIL
 7. .\sim_cache 16 1024 1 8192 4 0 1 traces/compress_trace.txt   PASS
