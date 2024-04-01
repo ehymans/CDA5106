@@ -58,6 +58,17 @@ int l2_writeback_counter = 0;
         {
             break;
         }*/
+        if((L1_cache.writeback_flag) && isL2Enabled)
+        {
+            // L2 writes: equal to the number of dirty blocks evicted from L1 that need to be written back to L2 or main memory.   
+            bool isL2_writeback_hit = L2_cache.simulate_access('w', L1_cache.evicted_address);
+            /*
+            if(!isL2_writeback_hit)     // if the L2 writeback itself is a MISS 
+            {
+    
+            }*/
+        }
+
         if (!hitInL1 && isL2Enabled)    // if miss in L1 and L2 is enabled
         {
             bool hitInL2 = L2_cache.simulate_access('r', address);      // read L2 cache and attempt to find address 
@@ -71,18 +82,7 @@ int l2_writeback_counter = 0;
                 l2_writeback_counter++;
             }*/
         }
-        
-        if((L1_cache.writeback_flag) && isL2Enabled)
-        {
-            // L2 writes: equal to the number of dirty blocks evicted from L1 that need to be written back to L2 or main memory.   
-            bool isL2_writeback_hit = L2_cache.simulate_access('w', L1_cache.evicted_address);
 
-            /*
-            if(!isL2_writeback_hit)     // if the L2 writeback itself is a MISS 
-            {
-    
-            }*/
-        }
     }
      
      cout << "L1 Cache Contents:\n";
