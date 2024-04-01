@@ -74,6 +74,8 @@ public:
     bool hit_miss_simulate(char op, long long address);
 
     bool L2_simulate_access(char op, long long address);
+
+    void make_dirty(long long address);
 };
 
 int Cache::calculate_set_index(long long address)
@@ -312,6 +314,22 @@ void Cache::print_contents()
                 cout << " [Empty]";
         }
         cout << dec << "\n"; // Switch back to decimal for non-hex output
+    }
+}
+
+void Cache::make_dirty(long long address)
+{
+    int log_block_size = static_cast<int>(log2(block_size));
+    int set_index = (address >> log_block_size) % num_sets;
+    long long tag = address >> (log_block_size + static_cast<int>(log2(num_sets)));
+
+    // Search for the tag in the set
+    for (int i = 0; i < assoc; i++)
+    {
+        if (sets[set_index].lines[i].tag == tag)
+        {
+            sets[set_index].lines[i].dirty = true;
+        }
     }
 }
 

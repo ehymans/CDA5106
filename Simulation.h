@@ -70,6 +70,7 @@ void Simulation::run()
             {
                 // Potential solution: track recently evicted block at cache level,
                 // Grab recentely evicted here and invalidate block in L1
+                L1_cache.make_dirty(L2_cache.evicted_address);
             }
         }
 
@@ -78,11 +79,10 @@ void Simulation::run()
             // L2 writes: equal to the number of dirty blocks evicted from L1 that need to be written back to L2 or main memory.
             bool isL2_writeback_hit = L2_cache.simulate_access('w', L1_cache.evicted_address);
 
-            /*
-            if(!isL2_writeback_hit)     // if the L2 writeback itself is a MISS
+            if (!isL2_writeback_hit) // if the L2 writeback itself is a MISS
             {
-
-            }*/
+                L1_cache.make_dirty(L2_cache.evicted_address);
+            }
         }
     }
 
