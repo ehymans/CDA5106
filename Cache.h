@@ -184,11 +184,8 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
             // get index of first element in queue
             int fifo_index = sets[set_index].fifo_position.front();
 
-            // If that line to be replaced is dirty, increment writeback
-            if (sets[set_index].lines[fifo_index].dirty)
-            {
-                writebacks++;
-            }
+            // Evict the LRU block
+            evict_block(set_index, fifo_index);
 
             // Perform tag replacement
             sets[set_index].lines[fifo_index].tag = tag;
