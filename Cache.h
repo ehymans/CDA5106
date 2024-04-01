@@ -11,6 +11,9 @@
 #include <iomanip>
 #include <unordered_map>
 
+// @optimal
+#include <deque>
+
 using namespace std;
 
 class Cache
@@ -33,6 +36,9 @@ private:
     unsigned long long write_misses = 0;
     unsigned long long writebacks = 0;
     // bool writeback_flag = false;
+
+    // @optimal
+    deque<long long> accesses;
 
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion)
@@ -74,6 +80,10 @@ public:
     bool hit_miss_simulate(char op, long long address);
 
     bool L2_simulate_access(char op, long long address);
+
+    // @optimal
+    void update_next_use();
+    void set_next_use(deque<long long> in_accesses);
 };
 
 int Cache::calculate_set_index(long long address)
@@ -145,6 +155,18 @@ void Cache::update_fifo(int set_index, int index)
     sets[set_index].fifo_position.push(index);
 }
 
+// @optimal
+void Cache::update_next_use()
+{
+    accesses.pop_front();
+}
+
+// @optimal
+void Cache::set_next_use(deque<long long> in_accesses)
+{
+    accesses = in_accesses;
+}
+
 bool Cache::allocate_block(int set_index, long long tag, char op)
 {
     bool foundEmptyLine = false;
@@ -200,7 +222,44 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
         else if (replacement_policy == 2)
         {
             // OPTIMAL
-            // Implement OPTIMAL policy specific logic here
+            int optimal_index = -1;
+            int highestFutureUse = -1;
+            for (int i = 0; i < assoc; i++)
+            {
+                bool found = false;
+                for (int j = 0; j < accesses.size(); j++)
+                {
+                    if (accesses[j] == sets[set_index].lines[i].tag)
+                    {
+                        if (j > highestFutureUse)
+                        {
+                            highestFutureUse = j;
+                            optimal_index = i;
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    optimal_index = i;
+                    break;
+                }
+            }
+
+            if (optimal_index == -1)
+            {
+                // problem
+                optimal_index = 0;
+            }
+
+            if (sets[set_index].lines[optimal_index].dirty)
+            {
+                writebacks++;
+            }
+
+            sets[set_index].lines[optimal_index].tag = tag;
+            sets[set_index].lines[optimal_index].dirty = (op == 'w'); // Set dirty based on operation
         }
     }
     return true;
