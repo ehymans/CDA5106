@@ -5,6 +5,8 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <time.h>
+#include <chrono>
 
 class Simulation {
 private:
@@ -49,12 +51,14 @@ void Simulation::run()
         return;
     }
 
+    srand(time(NULL));
     char op;
     long long address;
     int l2_writeback_counter = 0;
-
     int L1_writeback_from_invalidation_counter = 0;
-    while (inp >> op >> hex >> address)
+  
+    auto start_time = chrono::steady_clock::now();
+    while (inp >> op >> hex >> address) 
     {
 
         if(inclusionPolicy == 0)    // for non-inclusive cache
@@ -115,6 +119,7 @@ void Simulation::run()
             }
         }
     }
+    auto duration = chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start_time).count();
      
      cout << "L1 Cache Contents:\n";
      L1_cache.print_contents();
@@ -153,6 +158,11 @@ void Simulation::run()
     {
         L1_cache.calculate_memory_traffic();
     }
+    
+    L1_cache.print_faults();
+    //L2_cache.print_faults();
+    cout << "bit error rate: " << static_cast<float>(L1_cache.getFaults()) / 
+        (L1_cache.getBlockSize() * L1_cache.getAssoc() * L1_cache.getNumSets()) << " per " << duration << " milliseconds";
 }
 
 #endif // SIMULATION_H

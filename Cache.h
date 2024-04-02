@@ -10,6 +10,7 @@
 #include <cmath>
 #include <iomanip>
 #include <unordered_map>
+#include <cstdlib>
 
 using namespace std;
 
@@ -35,18 +36,21 @@ private:
     unsigned long long writebacks = 0;
     unsigned long long inclusive_writeback_counter = 0;
     // bool writeback_flag = false;
+    unsigned long long faults = 0;
+    unsigned int fault_rate = 1000;
 
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion)
     {
         num_sets = size == 0 ? 0 : size / (block_size * assoc);
-        sets.resize(num_sets, CacheSet(assoc));
+        sets.resize(num_sets, CacheSet(assoc, block_size));
     }
 
     // Public methods for Cache operations
     unsigned long long getNumSets() const { return num_sets; }
     unsigned int getAssoc() const { return assoc; }
     unsigned int getBlockSize() const { return block_size; }
+    unsigned int getFaults() const { return faults; }
 
     bool evict_block(int set_index, int block_index);
 
@@ -64,6 +68,7 @@ public:
     void L2_print_statistics();
 
     void print_contents();
+    void print_faults();
     int calculate_set_index(long long address);
     long long calculate_tag(long long address);
 
@@ -154,6 +159,7 @@ void Cache::update_fifo(int set_index, int index)
 
 bool Cache::allocate_block(int set_index, long long tag, char op)
 {
+    int line_index;
     bool foundEmptyLine = false;
     for (int i = 0; i < assoc; ++i)
     {
@@ -163,6 +169,7 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
             sets[set_index].lines[i].dirty = (op == 'w'); // Set dirty if it's a write
             update_lru(set_index, i);                     // Move to the most recently used position
             sets[set_index].fifo_position.push(i);        // Add index to fifo queue
+            line_index = i;
             foundEmptyLine = true;
             break;
         }
@@ -174,6 +181,7 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
         if (replacement_policy == 0)
         {
             int lru_index = sets[set_index].lru_position.front();
+            line_index = lru_index;
 
             // Evict the LRU block
             evict_block(set_index, lru_index);
@@ -190,6 +198,7 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
             // FIFO
             // get index of first element in queue
             int fifo_index = sets[set_index].fifo_position.front();
+            line_index = fifo_index;
 
             // If that line to be replaced is dirty, increment writeback
             if (sets[set_index].lines[fifo_index].dirty)
@@ -209,6 +218,18 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
             // OPTIMAL
             // Implement OPTIMAL policy specific logic here
         }
+    }
+
+    if (rand() < RAND_MAX / fault_rate)
+    {
+        sets[set_index].lines[line_index].fault = true;
+
+        // Select random bit to flip
+        int bits_index = rand() % (block_size * 8);
+        sets[set_index].lines[line_index].bits[bits_index] = 
+            sets[set_index].lines[line_index].bits[bits_index] == '1' ? '0' : '1';
+
+        ++faults;
     }
     return true;
 }
@@ -372,6 +393,21 @@ void Cache::print_contents()
         }
         cout << dec << "\n"; // Switch back to decimal for non-hex output
     }
+}
+
+void Cache::print_faults()
+{
+    cout << "Lines with faults:\n";
+    for (unsigned long long i = 0; i < num_sets; ++i)
+    {
+        for (unsigned long long j = 0; j < assoc; ++j) 
+        {
+            if (sets[i].lines[j].fault)
+                cout << "Set " << i << ", Line " << j << ":\n" << sets[i].lines[j].bits << "\n"; 
+        }
+    }
+
+    cout << "\nFaults: " << getFaults() << "\n";
 }
 
 #endif // CACHE_H
