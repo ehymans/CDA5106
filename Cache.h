@@ -56,6 +56,8 @@ public:
 
     bool simulate_access(char op, long long address);
 
+    bool check_and_invalidate(long long address);
+
     void L1_print_statistics();
     void L2_print_statistics();
 
@@ -175,7 +177,7 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
             sets[set_index].lines[lru_index].tag = tag;
             sets[set_index].lines[lru_index].dirty = (op == 'w'); // Set dirty based on operation
 
-            // Since we just used this block, we need to update its LRU position
+            // Since we just used this block, update its LRU position
             update_lru(set_index, lru_index);
         }
         else if (replacement_policy == 1)
@@ -204,6 +206,37 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
         }
     }
     return true;
+}
+
+// for inclusive cache --> check if the block is there and invalidate
+bool Cache::check_and_invalidate(long long address)
+{
+    int log_block_size = static_cast<int>(log2(block_size));
+    int set_index = (address >> log_block_size) % num_sets;
+    long long tag = address >> (log_block_size + static_cast<int>(log2(num_sets)));
+
+    // iterate through the set to find a matching tag
+    for (int i = 0; i < assoc; i++)
+    {
+        if (sets[set_index].lines[i].tag == tag)
+        {
+            // Block found, invalidate it
+            bool wasDirty = sets[set_index].lines[i].dirty;
+            sets[set_index].lines[i].tag = -1; // invalidate the block
+            sets[set_index].lines[i].dirty = false; // clear the dirty flag
+            
+            // If the block was dirty --> writeback to main memory
+            if (wasDirty)
+            {
+                //writebacks++; // increment WB counter
+            }
+
+            return wasDirty; // return true if the block was dirty 
+        }
+    }
+
+    // Block not found or not dirty, no writeback needed
+    return false;
 }
 
 bool Cache::simulate_access(char op, long long address)
