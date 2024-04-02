@@ -4,10 +4,9 @@ OPT = -O3
 WARN = -Wall
 CFLAGS = $(OPT) $(WARN) $(INC) $(LIB)
 
-# Since you only mentioned one .cpp file, I'll list it here. Adjust if you have more.
 SIM_SRC = sim_cache.cpp
 
-# The corresponding object file for your .cpp file
+# Output the object file 
 SIM_OBJ = sim_cache.o
 
 #################################
@@ -23,17 +22,17 @@ sim_cache: $(SIM_OBJ)
 	$(CC) -o sim_cache $(CFLAGS) $(SIM_OBJ) -lm
 	@echo "-----------DONE WITH SIM_CACHE-----------"
 
-# generic rule for converting any .cpp file to any .o file
+# rule to convert  cpp to .o
 
 .cpp.o:
 	$(CC) $(CFLAGS) -c $*.cpp
 
-# type "make clean" to remove all .o files plus the sim_cache binary
+# "make clean" removes all .o files plus the sim_cache binary
 
 clean:
 	rm -f *.o sim_cache
 
-# type "make clobber" to remove all .o files (leaves sim_cache binary)
+# "make clobber" removes all .o files (leaves sim_cache binary)
 
 clobber:
 	rm -f *.o
