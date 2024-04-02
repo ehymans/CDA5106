@@ -13,6 +13,7 @@ private:
     std::string trace_file;
     bool isL2Enabled;
     unsigned int inclusionPolicy;
+    unsigned int total_memory_traffic;
 
 public:
     Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc, 
@@ -51,6 +52,8 @@ void Simulation::run()
     char op;
     long long address;
     int l2_writeback_counter = 0;
+
+    int L1_writeback_from_invalidation_counter = 0;
     while (inp >> op >> hex >> address)
     {
 
@@ -62,20 +65,11 @@ void Simulation::run()
             {
                 // L2 writes: equal to the number of dirty blocks evicted from L1 that need to be written back to L2 or main memory.
                 bool isL2_writeback_hit = L2_cache.simulate_access('w', L1_cache.evicted_address);
-
-                if (!isL2_writeback_hit) // if the L2 writeback itself is a MISS
-                {
-
-                }
             }
 
             if (!hitInL1 && isL2Enabled) // if miss in L1 and L2 is enabled
             {
                 bool hitInL2 = L2_cache.simulate_access('r', address); // read L2 cache and attempt to find address
-
-                if (!hitInL2)
-                {
-                }
             }
         }
         else if(inclusionPolicy == 1) // for inclusive cache
@@ -139,7 +133,26 @@ void Simulation::run()
     {
         cout << "\nL2 Cache Statistics\n";
         L2_cache.L2_print_statistics();    // L2 stats
-    }   
+    }
+    if(inclusionPolicy == 0 && isL2Enabled)
+    {
+        // non-inclusive, L2 enabled
+        L2_cache.calculate_memory_traffic();
+    }
+    else if(inclusionPolicy == 1 && isL2Enabled)
+    {
+        // inclusive, L2 enabled
+        total_memory_traffic = (L2_cache.calculate_inclusive_memory_traffic() + L1_cache.return_inclusive_writeback_counter());
+        cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
+    }
+    else if(inclusionPolicy == 0 && (!isL2Enabled))
+    {
+        L1_cache.calculate_memory_traffic();
+    }
+    else if(inclusionPolicy == 1 && (!isL2Enabled))
+    {
+        L1_cache.calculate_memory_traffic();
+    }
 }
 
 #endif // SIMULATION_H

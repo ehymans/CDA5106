@@ -27,11 +27,13 @@ private:
     unsigned long long miss_count = 0;
     unsigned long long reads_count = 0;
     unsigned long long writes_count = 0;
+    unsigned long long total_memory_traffic = 0;
 
     // additional output stats
     unsigned long long read_misses = 0;
     unsigned long long write_misses = 0;
     unsigned long long writebacks = 0;
+    unsigned long long inclusive_writeback_counter = 0;
     // bool writeback_flag = false;
 
 public:
@@ -76,6 +78,9 @@ public:
     bool hit_miss_simulate(char op, long long address);
 
     bool L2_simulate_access(char op, long long address);
+    void calculate_memory_traffic();
+    int calculate_inclusive_memory_traffic();
+    int return_inclusive_writeback_counter();
 };
 
 int Cache::calculate_set_index(long long address)
@@ -228,7 +233,7 @@ bool Cache::check_and_invalidate(long long address)
             // If the block was dirty --> writeback to main memory
             if (wasDirty)
             {
-                //writebacks++; // increment WB counter
+                inclusive_writeback_counter++;
             }
 
             return wasDirty; // return true if the block was dirty 
@@ -301,6 +306,24 @@ bool Cache::simulate_access(char op, long long address)
     }
 
     return hit;
+}
+
+void Cache::calculate_memory_traffic()
+{
+    total_memory_traffic = (read_misses + write_misses + writebacks);
+    cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
+}
+
+int Cache::calculate_inclusive_memory_traffic()
+{
+    total_memory_traffic = (read_misses + write_misses + writebacks);
+    //cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
+    return total_memory_traffic;
+}
+
+int Cache::return_inclusive_writeback_counter()
+{
+    return inclusive_writeback_counter;
 }
 
 void Cache::L1_print_statistics()
