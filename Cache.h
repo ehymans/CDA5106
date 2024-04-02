@@ -28,14 +28,15 @@ private:
     unsigned long long miss_count = 0;
     unsigned long long reads_count = 0;
     unsigned long long writes_count = 0;
+    unsigned long long total_memory_traffic = 0;
 
     // additional output stats
     unsigned long long read_misses = 0;
     unsigned long long write_misses = 0;
     unsigned long long writebacks = 0;
-    unsigned long long faults = 0;
+    unsigned long long inclusive_writeback_counter = 0;
     // bool writeback_flag = false;
-
+    unsigned long long faults = 0;
     unsigned int fault_rate = 1000;
 
 public:
@@ -61,6 +62,8 @@ public:
 
     bool simulate_access(char op, long long address);
 
+    bool check_and_invalidate(long long address);
+
     void L1_print_statistics();
     void L2_print_statistics();
 
@@ -80,6 +83,9 @@ public:
     bool hit_miss_simulate(char op, long long address);
 
     bool L2_simulate_access(char op, long long address);
+    void calculate_memory_traffic();
+    int calculate_inclusive_memory_traffic();
+    int return_inclusive_writeback_counter();
 };
 
 int Cache::calculate_set_index(long long address)
@@ -184,7 +190,7 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
             sets[set_index].lines[lru_index].tag = tag;
             sets[set_index].lines[lru_index].dirty = (op == 'w'); // Set dirty based on operation
 
-            // Since we just used this block, we need to update its LRU position
+            // Since we just used this block, update its LRU position
             update_lru(set_index, lru_index);
         }
         else if (replacement_policy == 1)
@@ -226,6 +232,37 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
         ++faults;
     }
     return true;
+}
+
+// for inclusive cache --> check if the block is there and invalidate
+bool Cache::check_and_invalidate(long long address)
+{
+    int log_block_size = static_cast<int>(log2(block_size));
+    int set_index = (address >> log_block_size) % num_sets;
+    long long tag = address >> (log_block_size + static_cast<int>(log2(num_sets)));
+
+    // iterate through the set to find a matching tag
+    for (int i = 0; i < assoc; i++)
+    {
+        if (sets[set_index].lines[i].tag == tag)
+        {
+            // Block found, invalidate it
+            bool wasDirty = sets[set_index].lines[i].dirty;
+            sets[set_index].lines[i].tag = -1; // invalidate the block
+            sets[set_index].lines[i].dirty = false; // clear the dirty flag
+            
+            // If the block was dirty --> writeback to main memory
+            if (wasDirty)
+            {
+                inclusive_writeback_counter++;
+            }
+
+            return wasDirty; // return true if the block was dirty 
+        }
+    }
+
+    // Block not found or not dirty, no writeback needed
+    return false;
 }
 
 bool Cache::simulate_access(char op, long long address)
@@ -290,6 +327,24 @@ bool Cache::simulate_access(char op, long long address)
     }
 
     return hit;
+}
+
+void Cache::calculate_memory_traffic()
+{
+    total_memory_traffic = (read_misses + write_misses + writebacks);
+    cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
+}
+
+int Cache::calculate_inclusive_memory_traffic()
+{
+    total_memory_traffic = (read_misses + write_misses + writebacks);
+    //cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
+    return total_memory_traffic;
+}
+
+int Cache::return_inclusive_writeback_counter()
+{
+    return inclusive_writeback_counter;
 }
 
 void Cache::L1_print_statistics()
