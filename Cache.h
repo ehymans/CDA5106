@@ -12,7 +12,8 @@
 #include <unordered_map>
 
 // @optimal
-#include <deque>
+//#include <deque>
+#include <map>
 
 using namespace std;
 
@@ -38,7 +39,8 @@ private:
     // bool writeback_flag = false;
 
     // @optimal
-    deque<long long> accesses;
+    //deque<long long> accesses;
+    map<pair<int, long long>, queue<int>*> next_use_index;
 
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion)
@@ -81,9 +83,13 @@ public:
 
     bool L2_simulate_access(char op, long long address);
 
+    long long address_to_tag(long long address);
+
     // @optimal
     void update_next_use();
-    void set_next_use(deque<long long> in_accesses);
+    //void set_next_use(deque<long long> in_accesses);
+    void set_next_use(map<long long, queue<int>>& in_accesses);
+
 };
 
 int Cache::calculate_set_index(long long address)
@@ -158,13 +164,30 @@ void Cache::update_fifo(int set_index, int index)
 // @optimal
 void Cache::update_next_use()
 {
-    accesses.pop_front();
+    //accesses.pop_front();
 }
 
 // @optimal
-void Cache::set_next_use(deque<long long> in_accesses)
+/*void Cache::set_next_use(deque<long long> in_accesses)
 {
     accesses = in_accesses;
+}*/
+
+void Cache::set_next_use(map<long long, queue<int>>& accesses)
+{
+    //create a new map that has new keys but points to THE SAME queues
+    int log_block_size = static_cast<int>(log2(block_size));
+
+    map<long long, queue<int>>::iterator ptr = accesses.begin();
+    while (ptr != accesses.end())
+    {
+        long long tag = address_to_tag(ptr->first);
+        int set_index = (ptr->first >> log_block_size) % num_sets;
+        pair<int, long long> key(set_index, tag);
+        next_use_index.emplace(key, &(ptr->second));
+
+        ptr++;
+    }
 }
 
 bool Cache::allocate_block(int set_index, long long tag, char op)
@@ -224,7 +247,7 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
             // OPTIMAL
             int optimal_index = -1;
             int highestFutureUse = -1;
-            for (int i = 0; i < assoc; i++)
+            /*for (int i = 0; i < assoc; i++)
             {
                 bool found = false;
                 for (int j = 0; j < accesses.size(); j++)
@@ -245,7 +268,37 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
                     optimal_index = i;
                     break;
                 }
+            }*/
+
+            for (int i = 0; i < assoc; i++){
+                pair<int, long long> key(set_index,tag);
+                auto ptr = next_use_index.find(key);
+                if (ptr == next_use_index.end()){
+                    optimal_index = i;
+                    highestFutureUse = -4;
+
+                    break;
+                }
+                if (ptr->second == NULL){
+                    //uh oh
+                    optimal_index = i;
+                    highestFutureUse = -3;
+
+                    break;
+                }
+
+                if (ptr->second->empty()){
+                    optimal_index = i;
+                    highestFutureUse = -2;
+
+                    break;
+                }
+                if (ptr->second->front() > highestFutureUse) {
+                    highestFutureUse = ptr->second->front();
+                    optimal_index = i;
+                }
             }
+
 
             if (optimal_index == -1)
             {
@@ -375,6 +428,12 @@ void Cache::print_contents()
         }
         cout << dec << "\n"; // Switch back to decimal for non-hex output
     }
+}
+
+long long Cache::address_to_tag(long long address){
+    int log_block_size = static_cast<int>(log2(block_size));
+    long long tag = address >> (log_block_size + static_cast<int>(log2(num_sets)));
+    return tag;
 }
 
 #endif // CACHE_H

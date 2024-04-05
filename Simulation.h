@@ -16,7 +16,8 @@ private:
 
     // @optimal
     unsigned int replacement_policy;
-    struct Operation
+    map<long long, queue<int>> accesses;
+    /*struct Operation
     {
         int op;
         long long address;
@@ -25,7 +26,7 @@ private:
             op = in_op;
             address = in_address;
         }
-    };
+    };*/
 
 public:
     Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc,
@@ -70,22 +71,67 @@ void Simulation::run()
     int l2_writeback_counter = 0;
 
     // @optimal
-    deque<long long> accesses;
-    vector<Operation> lines;
+    //deque<long long> accesses;
+    //vector<Operation> lines;
+    long long previous;
+    int count = 0;
 
-    while (inp >> op >> hex >> address)
+    //pre-processing
+    while (inp >> op >> hex >> address) {
+
+        // @optimal
+        //Operation line(op, address);
+        //accesses.push_back(address);
+        //lines.push_back(line);
+        if (previous != address) {
+            //add previous
+            map<long long, queue<int>>::iterator elem = accesses.find(previous);
+            // check if elem was found
+            if (elem != accesses.end()) {
+                elem->second.push(count - 1);
+            } else {
+                queue<int> v({count - 1});
+                accesses.emplace(previous, v);
+            }
+        }
+
+        count++;
+        previous = address;
+
+    }
+
+    // need to insert the last item
+    map<long long, queue<int>>::iterator elem = accesses.find(previous);
+    // check if elem was found
+    if(elem != accesses.end())
     {
+        elem->second.push(count-1);
+    }
+    else
+    {
+        queue<int> v({count-1});
+        accesses.emplace(previous, v);
+    }
+
+
+    L1_cache.set_next_use(accesses);
+    if (isL2Enabled)
+    {
+        L2_cache.set_next_use(accesses);
+    }
+
+    inp.close();
+
+    inp.open(trace_file);
+    int current_line = 0;
+
+    while (inp >> op >> hex >> address) {
 
         bool hitInL1 = L1_cache.simulate_access(op, address); // returns hit (true) or miss (false)
         /*if(hitInL1)
         {
             break;
         }*/
-
-        // @optimal
-        Operation line(op, address);
-        accesses.push_back(address);
-        lines.push_back(line);
 
         if (!hitInL1 && isL2Enabled) // if miss in L1 and L2 is enabled
         {
@@ -112,13 +158,32 @@ void Simulation::run()
 
             }*/
         }
+
+        // @optimal
+        if (replacement_policy == 2)
+        {
+            /*L1_cache.update_next_use();
+            if (isL2Enabled)
+            {
+                L2_cache.update_next_use();
+            }*/
+
+            if (accesses[address].front() <= current_line)
+            {
+                accesses[address].pop();
+            }
+
+        }
+        current_line++;
     }
 
-    // @optimal
-    L1_cache.set_next_use(accesses);
-    L2_cache.set_next_use(accesses);
+    inp.close();
 
-    for (vector<Operation>::iterator itr = lines.begin();
+    // @optimal
+    /*L1_cache.set_next_use(accesses);
+    L2_cache.set_next_use(accesses);*/
+
+   /* for (vector<Operation>::iterator itr = lines.begin();
          itr < lines.end(); itr++)
     {
         // cout << "Operation: " << op << ", Address: " << address << "\n"; // Debug print
@@ -137,7 +202,7 @@ void Simulation::run()
                 L2_cache.update_next_use();
             }
         }
-    }
+    }*/
 
     cout << "L1 Cache Contents:\n";
     L1_cache.print_contents();
