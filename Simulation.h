@@ -17,16 +17,6 @@ private:
     // @optimal
     unsigned int replacement_policy;
     map<long long, queue<int>> accesses;
-    /*struct Operation
-    {
-        int op;
-        long long address;
-        Operation(int in_op, long long in_address)
-        {
-            op = in_op;
-            address = in_address;
-        }
-    };*/
 
 public:
     Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc,
@@ -71,8 +61,6 @@ void Simulation::run()
     int l2_writeback_counter = 0;
 
     // @optimal
-    //deque<long long> accesses;
-    //vector<Operation> lines;
     long long previous;
     int count = 0;
 
@@ -80,9 +68,7 @@ void Simulation::run()
     while (inp >> op >> hex >> address) {
 
         // @optimal
-        //Operation line(op, address);
-        //accesses.push_back(address);
-        //lines.push_back(line);
+        // setup map of next usages
         if (previous != address) {
             //add previous
             map<long long, queue<int>>::iterator elem = accesses.find(previous);
@@ -162,11 +148,9 @@ void Simulation::run()
         // @optimal
         if (replacement_policy == 2)
         {
-            /*L1_cache.update_next_use();
-            if (isL2Enabled)
-            {
-                L2_cache.update_next_use();
-            }*/
+            // Update the set of next address usages
+            // If there are multiple usages in a row we only keep the latest
+            // Remove that entry for current address if we are at the current latest use
 
             if (accesses[address].front() <= current_line)
             {
@@ -178,31 +162,6 @@ void Simulation::run()
     }
 
     inp.close();
-
-    // @optimal
-    /*L1_cache.set_next_use(accesses);
-    L2_cache.set_next_use(accesses);*/
-
-   /* for (vector<Operation>::iterator itr = lines.begin();
-         itr < lines.end(); itr++)
-    {
-        // cout << "Operation: " << op << ", Address: " << address << "\n"; // Debug print
-        //  First, attempt access in L1 cache
-        if (!L1_cache.simulate_access(itr->op, itr->address) && isL2Enabled)
-        {
-            // If miss in L1, access L2 cache
-            L2_cache.simulate_access(itr->op, itr->address);
-        }
-
-        if (replacement_policy == 2)
-        {
-            L1_cache.update_next_use();
-            if (isL2Enabled)
-            {
-                L2_cache.update_next_use();
-            }
-        }
-    }*/
 
     cout << "L1 Cache Contents:\n";
     L1_cache.print_contents();

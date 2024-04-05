@@ -39,8 +39,8 @@ private:
     // bool writeback_flag = false;
 
     // @optimal
-    //deque<long long> accesses;
-    map<pair<int, long long>, queue<int>*> next_use_index;
+    map<long long, queue<int>>* next_use_index;
+
 
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion)
@@ -68,8 +68,9 @@ public:
     void L2_print_statistics();
 
     void print_contents();
-    int calculate_set_index(long long address);
-    long long calculate_tag(long long address);
+    int calculate_set_index(long long address) const;
+    long long calculate_tag(long long address) const;
+    long long calculate_address(long long tag, int set_index) const;
 
     int find_lru_block(int set_index);
     bool writeback_flag;
@@ -83,27 +84,30 @@ public:
 
     bool L2_simulate_access(char op, long long address);
 
-    long long address_to_tag(long long address);
+
 
     // @optimal
-    void update_next_use();
-    //void set_next_use(deque<long long> in_accesses);
     void set_next_use(map<long long, queue<int>>& in_accesses);
 
 };
 
-int Cache::calculate_set_index(long long address)
+int Cache::calculate_set_index(long long address) const
 {
     int log_block_size = static_cast<int>(log2(block_size));
     return (address >> log_block_size) % num_sets;
 }
 
-long long Cache::calculate_tag(long long address)
+long long Cache::calculate_tag(long long address) const
 {
     int log_block_size = static_cast<int>(log2(block_size));
     int log_num_sets = static_cast<int>(log2(num_sets));
     return address >> (log_block_size + log_num_sets);
 }
+
+long long Cache::calculate_address(long long tag, int set_index) const {
+    return (tag << (static_cast<int>(log2(block_size)) + static_cast<int>(log2(num_sets)))) | (set_index << static_cast<int>(log2(block_size)));
+}
+
 
 int Cache::find_lru_block(int set_index)
 {
@@ -162,32 +166,10 @@ void Cache::update_fifo(int set_index, int index)
 }
 
 // @optimal
-void Cache::update_next_use()
-{
-    //accesses.pop_front();
-}
-
-// @optimal
-/*void Cache::set_next_use(deque<long long> in_accesses)
-{
-    accesses = in_accesses;
-}*/
-
 void Cache::set_next_use(map<long long, queue<int>>& accesses)
 {
-    //create a new map that has new keys but points to THE SAME queues
-    int log_block_size = static_cast<int>(log2(block_size));
-
-    map<long long, queue<int>>::iterator ptr = accesses.begin();
-    while (ptr != accesses.end())
-    {
-        long long tag = address_to_tag(ptr->first);
-        int set_index = (ptr->first >> log_block_size) % num_sets;
-        pair<int, long long> key(set_index, tag);
-        next_use_index.emplace(key, &(ptr->second));
-
-        ptr++;
-    }
+    // just a pointer to the map in Simulator to avoid duplicating data
+    next_use_index = &accesses;
 }
 
 bool Cache::allocate_block(int set_index, long long tag, char op)
@@ -247,57 +229,48 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
             // OPTIMAL
             int optimal_index = -1;
             int highestFutureUse = -1;
-            /*for (int i = 0; i < assoc; i++)
-            {
-                bool found = false;
-                for (int j = 0; j < accesses.size(); j++)
-                {
-                    if (accesses[j] == sets[set_index].lines[i].tag)
-                    {
-                        if (j > highestFutureUse)
-                        {
-                            highestFutureUse = j;
-                            optimal_index = i;
-                        }
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                {
-                    optimal_index = i;
-                    break;
-                }
-            }*/
-
             for (int i = 0; i < assoc; i++){
-                pair<int, long long> key(set_index,tag);
-                auto ptr = next_use_index.find(key);
-                if (ptr == next_use_index.end()){
-                    optimal_index = i;
-                    highestFutureUse = -4;
+                long long block_address = calculate_address(sets[set_index].lines[i].tag, set_index);
 
+                // iterate through all possible addresses maping to this block for their next use
+                // we only care about the NEXT use
+                int next_use_of_block = INT_MAX;
+                for (int j = 0; j < block_size; j++)
+                {
+                    auto ptr = next_use_index->find(block_address + j);
+                    if (ptr == next_use_index->end()){
+                        continue;
+                    }
+
+                    if (ptr->second.empty()){
+                        continue;
+                    }
+
+                    if (ptr->second.front() < next_use_of_block) {
+                        next_use_of_block = ptr->second.front();
+                    }
+
+                }
+
+                if (next_use_of_block == INT_MAX){
+                    optimal_index = i;
                     break;
                 }
-                if (ptr->second == NULL){
-                    //uh oh
-                    optimal_index = i;
-                    highestFutureUse = -3;
 
-                    break;
-                }
-
-                if (ptr->second->empty()){
-                    optimal_index = i;
-                    highestFutureUse = -2;
-
-                    break;
-                }
-                if (ptr->second->front() > highestFutureUse) {
-                    highestFutureUse = ptr->second->front();
+                if (next_use_of_block > highestFutureUse){
+                    highestFutureUse = next_use_of_block;
                     optimal_index = i;
                 }
+
             }
+
+            /*cerr << "replacing tag:" << hex
+                 << sets[set_index].lines[optimal_index].tag
+                 << " representing address: "
+                 << calculate_address(sets[set_index].lines[optimal_index].tag, set_index)
+                 << " next use at instr: " << dec
+                 << highestFutureUse
+                 << endl;*/
 
 
             if (optimal_index == -1)
@@ -430,10 +403,5 @@ void Cache::print_contents()
     }
 }
 
-long long Cache::address_to_tag(long long address){
-    int log_block_size = static_cast<int>(log2(block_size));
-    long long tag = address >> (log_block_size + static_cast<int>(log2(num_sets)));
-    return tag;
-}
 
 #endif // CACHE_H
