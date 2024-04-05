@@ -1,6 +1,7 @@
 #ifndef CACHE_H
 #define CACHE_H
-// Your code here
+
+// includes
 #include "CacheComponents.h"
 #include <iostream>
 #include <vector>
@@ -10,6 +11,8 @@
 #include <cmath>
 #include <iomanip>
 #include <unordered_map>
+#include <map>
+#include <climits>
 
 using namespace std;
 
@@ -35,6 +38,9 @@ private:
     unsigned long long writebacks = 0;
     unsigned long long inclusive_writeback_counter = 0;
     // bool writeback_flag = false;
+    
+    // @optimal
+    map<long long, queue<int>>* next_use_index;
 
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion)
@@ -53,7 +59,6 @@ public:
     void update_lru(int set_index, int accessed_index);
     void update_fifo(int set_index, int index);
 
-    // bool allocate_block(int set_index, long long tag, bool evicted_block_dirty);
     bool allocate_block(int set_index, long long tag, char op);
 
     bool simulate_access(char op, long long address);
@@ -66,6 +71,7 @@ public:
     void print_contents();
     int calculate_set_index(long long address);
     long long calculate_tag(long long address);
+    long long calculate_address(long long tag, int set_index) const;
 
     int find_lru_block(int set_index);
     bool writeback_flag;
@@ -81,6 +87,10 @@ public:
     void calculate_memory_traffic();
     int calculate_inclusive_memory_traffic();
     int return_inclusive_writeback_counter();
+
+    // @optimal
+    void set_next_use(map<long long, queue<int>>& in_accesses);
+
 };
 
 int Cache::calculate_set_index(long long address)
@@ -96,19 +106,30 @@ long long Cache::calculate_tag(long long address)
     return address >> (log_block_size + log_num_sets);
 }
 
+long long Cache::calculate_address(long long tag, int set_index) const 
+{
+    return (tag << (static_cast<int>(log2(block_size)) + static_cast<int>(log2(num_sets)))) | (set_index << static_cast<int>(log2(block_size)));
+}
+
 int Cache::find_lru_block(int set_index)
 {
-    // Assuming lru_position stores indices of blocks in their LRU order,
-    // with the first element being the LRU block.
+    // first element is LRU block
     if (!sets[set_index].lru_position.empty())
     {
         return sets[set_index].lru_position.front();
     }
     else
     {
-        // Handle the case where there might not be any blocks (should not happen in a well-initialized cache)
-        return -1; // Return an invalid index if for some reason the set is empty
+        // when there isn't any blocks
+        return -1; // return invalid index
     }
+}
+
+// @optimal
+void Cache::set_next_use(map<long long, queue<int>>& accesses)
+{
+    // just a pointer to the map in Simulator to avoid duplicating data
+    next_use_index = &accesses;
 }
 
 bool Cache::evict_block(int set_index, int block_index)
@@ -207,7 +228,56 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
         else if (replacement_policy == 2)
         {
             // OPTIMAL
-            // Implement OPTIMAL policy specific logic here
+            int optimal_index = -1;
+            int highestFutureUse = -1;
+            for (int i = 0; i < assoc; i++){
+                long long block_address = calculate_address(sets[set_index].lines[i].tag, set_index);
+
+                // iterate through all possible addresses maping to this block for their next use
+                // we only care about the NEXT use
+                int next_use_of_block = INT_MAX;
+                for (int j = 0; j < block_size; j++)
+                {
+                    auto ptr = next_use_index->find(block_address + j);
+                    if (ptr == next_use_index->end()){
+                        continue;
+                    }
+
+                    if (ptr->second.empty()){
+                        continue;
+                    }
+
+                    if (ptr->second.front() < next_use_of_block) {
+                        next_use_of_block = ptr->second.front();
+                    }
+
+                }
+
+                if (next_use_of_block == INT_MAX){
+                    optimal_index = i;
+                    break;
+                }
+
+                if (next_use_of_block > highestFutureUse){
+                    highestFutureUse = next_use_of_block;
+                    optimal_index = i;
+                }
+
+            }
+
+            if (optimal_index == -1)
+            {
+                // problem
+                optimal_index = 0;
+            }
+
+            if (sets[set_index].lines[optimal_index].dirty)
+            {
+                writebacks++;
+            }
+
+            sets[set_index].lines[optimal_index].tag = tag;
+            sets[set_index].lines[optimal_index].dirty = (op == 'w'); // Set dirty based on operation
         }
     }
     return true;
@@ -290,10 +360,8 @@ bool Cache::simulate_access(char op, long long address)
     if (!hit)
     {
         // Miss
-        // miss_count++;
         // Both write misses and read misses will cause block to be allocated in Cache.
         allocate_block(set_index, tag, op);
-        // allocate_block(set_index, tag, wasDirty);
 
         if (op == 'r')
         {
@@ -317,7 +385,6 @@ void Cache::calculate_memory_traffic()
 int Cache::calculate_inclusive_memory_traffic()
 {
     total_memory_traffic = (read_misses + write_misses + writebacks);
-    //cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
     return total_memory_traffic;
 }
 
@@ -338,7 +405,6 @@ void Cache::L1_print_statistics()
     cout << "Write Misses: " << write_misses << "\n";
     cout << "Writebacks: " << writebacks << "\n";
     cout << "Miss Rate: " << fixed << setprecision(4) << (accesses > 0 ? miss_rate * 100 : 0) << "%\n";
-    // cout << "Miss rate: " << static_cast<float>(miss_count) / (hit_count + miss_count) * 100 << "%\n";
 }
 
 void Cache::L2_print_statistics()
@@ -352,9 +418,7 @@ void Cache::L2_print_statistics()
     cout << "Write operations: " << writes_count << "\n";
     cout << "Write Misses: " << write_misses << "\n";
     cout << "Writebacks: " << writebacks << "\n";
-    // cout << "Miss Rate: " << fixed << setprecision(4) << (accesses > 0 ? miss_rate * 100 : 0) << "%\n";
-    // cout << "Miss rate: " << static_cast<float>(miss_count) / (hit_count + miss_count) * 100 << "%\n";
-    cout << "Miss Rate: " << (static_cast<float>(read_misses) / (reads_count)) * 100 << "%\n";
+    cout << "Miss Rate: " << (static_cast<float>(read_misses) / (reads_count)) * 100 << "%\n";      // this MR calculation is specific to L2.
 }
 
 void Cache::print_contents()

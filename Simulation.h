@@ -5,6 +5,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <map>
 
 class Simulation {
 private:
@@ -15,6 +16,10 @@ private:
     unsigned int inclusionPolicy;
     unsigned int total_memory_traffic;
 
+    // optimal replacement 
+    unsigned int replacement_policy;
+    map<long long, queue<int>> accesses;
+
 public:
     Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc, 
                unsigned int L2_size, unsigned int L2_assoc, 
@@ -23,6 +28,7 @@ public:
         : L1_cache(L1_size, L1_assoc, block_size, replacement, inclusion),
           L2_cache(L2_size, L2_assoc, block_size, replacement, inclusion),
           trace_file(trace_file),
+          replacement_policy(replacement),
           isL2Enabled(L2_size != 0 && L2_assoc != 0), inclusionPolicy(inclusion) {}
 
     void run();
@@ -53,7 +59,59 @@ void Simulation::run()
     long long address;
     int l2_writeback_counter = 0;
 
-    int L1_writeback_from_invalidation_counter = 0;
+    // for optimal only //
+    long long previous;
+    int count = 0;
+    /////////////////////
+    int L1_writeback_from_invalidation_counter = 0;         // test counter 
+
+    //////////// OPTIMAL PRE-PROCESSING ////////////////
+    while (inp >> op >> hex >> address) 
+    {
+        // @optimal
+        // setup map of next usages
+        if (previous != address) {
+            //add previous
+            map<long long, queue<int>>::iterator elem = accesses.find(previous);
+            // check if elem was found
+            if (elem != accesses.end()) {
+                elem->second.push(count - 1);
+            } else {
+                queue<int> v({count - 1});
+                accesses.emplace(previous, v);
+            }
+        }
+
+        count++;
+        previous = address;
+    } 
+
+    // need to insert the last item
+    map<long long, queue<int>>::iterator elem = accesses.find(previous);
+    // check if elem was found
+    if(elem != accesses.end())
+    {
+        elem->second.push(count-1);
+    }
+    else
+    {
+        queue<int> v({count-1});
+        accesses.emplace(previous, v);
+    }
+
+
+    L1_cache.set_next_use(accesses);
+    if (isL2Enabled)
+    {
+        L2_cache.set_next_use(accesses);
+    }
+
+    inp.close();
+    //////////////// END OF OPTIMAL PRE-PROCESSING /////////////////////////
+
+    inp.open(trace_file);
+    int current_line = 0;
+
     while (inp >> op >> hex >> address)
     {
 
@@ -71,6 +129,18 @@ void Simulation::run()
             {
                 bool hitInL2 = L2_cache.simulate_access('r', address); // read L2 cache and attempt to find address
             }
+
+            // @optimal
+            if (replacement_policy == 2)
+            {
+                if (accesses[address].front() <= current_line)
+                {
+                    accesses[address].pop();
+                }
+
+            }
+            current_line++;
+
         }
         else if(inclusionPolicy == 1) // for inclusive cache
         {
@@ -115,7 +185,9 @@ void Simulation::run()
             }
         }
     }
-     
+
+    inp.close();   
+      
      cout << "L1 Cache Contents:\n";
      L1_cache.print_contents();
     
@@ -134,6 +206,8 @@ void Simulation::run()
         cout << "\nL2 Cache Statistics\n";
         L2_cache.L2_print_statistics();    // L2 stats
     }
+
+    //////////// MEMORY TRAFFIC CALCULATION ////////////
     if(inclusionPolicy == 0 && isL2Enabled)
     {
         // non-inclusive, L2 enabled
@@ -153,6 +227,8 @@ void Simulation::run()
     {
         L1_cache.calculate_memory_traffic();
     }
+    //////////////////////////////////////////////////////
+
 }
 
 #endif // SIMULATION_H
