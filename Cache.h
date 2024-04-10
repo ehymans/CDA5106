@@ -38,9 +38,9 @@ private:
     unsigned long long writebacks = 0;
     unsigned long long inclusive_writeback_counter = 0;
     // bool writeback_flag = false;
-    
+
     // @optimal
-    map<long long, queue<int>>* next_use_index;
+    map<long long, queue<int>> *next_use_index;
 
 public:
     Cache(unsigned int size, unsigned int assoc, unsigned int block_size, unsigned int replacement, unsigned int inclusion) : assoc(assoc), block_size(block_size), replacement_policy(replacement), inclusion_policy(inclusion)
@@ -48,6 +48,8 @@ public:
         num_sets = size == 0 ? 0 : size / (block_size * assoc);
         sets.resize(num_sets, CacheSet(assoc));
     }
+
+    float gMissRate = 0;
 
     // Public methods for Cache operations
     unsigned long long getNumSets() const { return num_sets; }
@@ -89,8 +91,7 @@ public:
     int return_inclusive_writeback_counter();
 
     // @optimal
-    void set_next_use(map<long long, queue<int>>& in_accesses);
-
+    void set_next_use(map<long long, queue<int>> &in_accesses);
 };
 
 int Cache::calculate_set_index(long long address)
@@ -106,7 +107,7 @@ long long Cache::calculate_tag(long long address)
     return address >> (log_block_size + log_num_sets);
 }
 
-long long Cache::calculate_address(long long tag, int set_index) const 
+long long Cache::calculate_address(long long tag, int set_index) const
 {
     return (tag << (static_cast<int>(log2(block_size)) + static_cast<int>(log2(num_sets)))) | (set_index << static_cast<int>(log2(block_size)));
 }
@@ -126,7 +127,7 @@ int Cache::find_lru_block(int set_index)
 }
 
 // @optimal
-void Cache::set_next_use(map<long long, queue<int>>& accesses)
+void Cache::set_next_use(map<long long, queue<int>> &accesses)
 {
     // just a pointer to the map in Simulator to avoid duplicating data
     next_use_index = &accesses;
@@ -230,7 +231,8 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
             // OPTIMAL
             int optimal_index = -1;
             int highestFutureUse = -1;
-            for (int i = 0; i < assoc; i++){
+            for (int i = 0; i < assoc; i++)
+            {
                 long long block_address = calculate_address(sets[set_index].lines[i].tag, set_index);
 
                 // iterate through all possible addresses maping to this block for their next use
@@ -239,30 +241,33 @@ bool Cache::allocate_block(int set_index, long long tag, char op)
                 for (int j = 0; j < block_size; j++)
                 {
                     auto ptr = next_use_index->find(block_address + j);
-                    if (ptr == next_use_index->end()){
+                    if (ptr == next_use_index->end())
+                    {
                         continue;
                     }
 
-                    if (ptr->second.empty()){
+                    if (ptr->second.empty())
+                    {
                         continue;
                     }
 
-                    if (ptr->second.front() < next_use_of_block) {
+                    if (ptr->second.front() < next_use_of_block)
+                    {
                         next_use_of_block = ptr->second.front();
                     }
-
                 }
 
-                if (next_use_of_block == INT_MAX){
+                if (next_use_of_block == INT_MAX)
+                {
                     optimal_index = i;
                     break;
                 }
 
-                if (next_use_of_block > highestFutureUse){
+                if (next_use_of_block > highestFutureUse)
+                {
                     highestFutureUse = next_use_of_block;
                     optimal_index = i;
                 }
-
             }
 
             if (optimal_index == -1)
@@ -297,16 +302,16 @@ bool Cache::check_and_invalidate(long long address)
         {
             // Block found, invalidate it
             bool wasDirty = sets[set_index].lines[i].dirty;
-            sets[set_index].lines[i].tag = -1; // invalidate the block
+            sets[set_index].lines[i].tag = -1;      // invalidate the block
             sets[set_index].lines[i].dirty = false; // clear the dirty flag
-            
+
             // If the block was dirty --> writeback to main memory
             if (wasDirty)
             {
                 inclusive_writeback_counter++;
             }
 
-            return wasDirty; // return true if the block was dirty 
+            return wasDirty; // return true if the block was dirty
         }
     }
 
@@ -399,6 +404,8 @@ void Cache::L1_print_statistics()
     unsigned long long accesses = reads_count + writes_count;
     float miss_rate = accesses > 0 ? static_cast<float>(read_misses + write_misses) / accesses : 0;
 
+    gMissRate = miss_rate * 100;
+
     cout << "Read operations: " << reads_count << "\n";
     cout << "Read Misses: " << read_misses << "\n";
     cout << "Write operations: " << writes_count << "\n";
@@ -418,7 +425,7 @@ void Cache::L2_print_statistics()
     cout << "Write operations: " << writes_count << "\n";
     cout << "Write Misses: " << write_misses << "\n";
     cout << "Writebacks: " << writebacks << "\n";
-    cout << "Miss Rate: " << (static_cast<float>(read_misses) / (reads_count)) * 100 << "%\n";      // this MR calculation is specific to L2.
+    cout << "Miss Rate: " << (static_cast<float>(read_misses) / (reads_count)) * 100 << "%\n"; // this MR calculation is specific to L2.
 }
 
 void Cache::print_contents()

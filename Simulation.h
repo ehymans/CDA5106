@@ -7,7 +7,8 @@
 #include <iostream>
 #include <map>
 
-class Simulation {
+class Simulation
+{
 private:
     Cache L1_cache;
     Cache L2_cache;
@@ -16,15 +17,15 @@ private:
     unsigned int inclusionPolicy;
     unsigned int total_memory_traffic;
 
-    // optimal replacement 
+    // optimal replacement
     unsigned int replacement_policy;
     map<long long, queue<int>> accesses;
 
 public:
-    Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc, 
-               unsigned int L2_size, unsigned int L2_assoc, 
-               unsigned int replacement, unsigned int inclusion, 
-               const std::string& trace_file)
+    Simulation(unsigned int block_size, unsigned int L1_size, unsigned int L1_assoc,
+               unsigned int L2_size, unsigned int L2_assoc,
+               unsigned int replacement, unsigned int inclusion,
+               const std::string &trace_file)
         : L1_cache(L1_size, L1_assoc, block_size, replacement, inclusion),
           L2_cache(L2_size, L2_assoc, block_size, replacement, inclusion),
           trace_file(trace_file),
@@ -32,25 +33,28 @@ public:
           isL2Enabled(L2_size != 0 && L2_assoc != 0), inclusionPolicy(inclusion) {}
 
     void run();
+    float getL1MissRate();
+    void getL1Stats();
 };
 
-void Simulation::run() 
+void Simulation::run()
 {
     std::cout << "Memory Hierarchy Configuration and Trace Filename:\n";
     // Configuration output
-    cout << "L1 Cache: " << L1_cache.getNumSets() * L1_cache.getAssoc() * L1_cache.getBlockSize() / 1024 
-            << "KB " << L1_cache.getAssoc() << "-way, Block size: " << L1_cache.getBlockSize() << "B\n";
+    cout << "L1 Cache: " << L1_cache.getNumSets() * L1_cache.getAssoc() * L1_cache.getBlockSize() / 1024
+         << "KB " << L1_cache.getAssoc() << "-way, Block size: " << L1_cache.getBlockSize() << "B\n";
 
     // Conditionally display L2 cache configuration based on whether it's enabled
-    
-    if (isL2Enabled) 
+
+    if (isL2Enabled)
     {
-        cout << "L2 Cache: " << L2_cache.getNumSets() * L2_cache.getAssoc() * L2_cache.getBlockSize() / 1024 
-                << "KB " << L2_cache.getAssoc() << "-way, Block size: " << L2_cache.getBlockSize() << "B\n";
-    } 
+        cout << "L2 Cache: " << L2_cache.getNumSets() * L2_cache.getAssoc() * L2_cache.getBlockSize() / 1024
+             << "KB " << L2_cache.getAssoc() << "-way, Block size: " << L2_cache.getBlockSize() << "B\n";
+    }
 
     std::ifstream inp(trace_file);
-    if (!inp) {
+    if (!inp)
+    {
         std::cerr << "Error opening trace file\n";
         return;
     }
@@ -63,20 +67,24 @@ void Simulation::run()
     long long previous;
     int count = 0;
     /////////////////////
-    int L1_writeback_from_invalidation_counter = 0;         // test counter 
+    int L1_writeback_from_invalidation_counter = 0; // test counter
 
     //////////// OPTIMAL PRE-PROCESSING ////////////////
-    while (inp >> op >> hex >> address) 
+    while (inp >> op >> hex >> address)
     {
         // @optimal
         // setup map of next usages
-        if (previous != address) {
-            //add previous
+        if (previous != address)
+        {
+            // add previous
             map<long long, queue<int>>::iterator elem = accesses.find(previous);
             // check if elem was found
-            if (elem != accesses.end()) {
+            if (elem != accesses.end())
+            {
                 elem->second.push(count - 1);
-            } else {
+            }
+            else
+            {
                 queue<int> v({count - 1});
                 accesses.emplace(previous, v);
             }
@@ -84,21 +92,20 @@ void Simulation::run()
 
         count++;
         previous = address;
-    } 
+    }
 
     // need to insert the last item
     map<long long, queue<int>>::iterator elem = accesses.find(previous);
     // check if elem was found
-    if(elem != accesses.end())
+    if (elem != accesses.end())
     {
-        elem->second.push(count-1);
+        elem->second.push(count - 1);
     }
     else
     {
-        queue<int> v({count-1});
+        queue<int> v({count - 1});
         accesses.emplace(previous, v);
     }
-
 
     L1_cache.set_next_use(accesses);
     if (isL2Enabled)
@@ -115,7 +122,7 @@ void Simulation::run()
     while (inp >> op >> hex >> address)
     {
 
-        if(inclusionPolicy == 0)    // for non-inclusive cache
+        if (inclusionPolicy == 0) // for non-inclusive cache
         {
             bool hitInL1 = L1_cache.simulate_access(op, address); // returns hit (true) or miss (false)
 
@@ -137,12 +144,10 @@ void Simulation::run()
                 {
                     accesses[address].pop();
                 }
-
             }
             current_line++;
-
         }
-        else if(inclusionPolicy == 1) // for inclusive cache
+        else if (inclusionPolicy == 1) // for inclusive cache
         {
             bool hitInL1 = L1_cache.simulate_access(op, address); // Returns hit (true) or miss (false)
 
@@ -155,10 +160,10 @@ void Simulation::run()
                 {
                     // If evicting a block from L2, invalidate the corresponding block in L1 if it exists
                     // The check_and_invalidate method should return true if the evicted block was dirty --> signals a direct WB to main mem.
-                    if(L2_cache.eviction_flag)
+                    if (L2_cache.eviction_flag)
                     {
                         bool L1_dirty_block_needs_writeback = L1_cache.check_and_invalidate(L2_cache.evicted_address);
-                        if(L1_dirty_block_needs_writeback)
+                        if (L1_dirty_block_needs_writeback)
                         {
                             // this would be a direct writeback to main mem.
                         }
@@ -173,10 +178,10 @@ void Simulation::run()
                 {
                     // Upon a miss in L2, when allocating a new block in L2, make sure to also check L1 for inclusivity
                     // If a block is evicted from L2, check if it exists in L1 and invalidate it
-                    if(L2_cache.eviction_flag)
+                    if (L2_cache.eviction_flag)
                     {
                         bool L1_dirty_block_needs_writeback = L1_cache.check_and_invalidate(L2_cache.evicted_address);
-                        if(L1_dirty_block_needs_writeback)
+                        if (L1_dirty_block_needs_writeback)
                         {
                             // If the invalidated block in L1 was dirty, handle direct writeback to main memory here.
                         }
@@ -186,49 +191,58 @@ void Simulation::run()
         }
     }
 
-    inp.close();   
-      
-     cout << "L1 Cache Contents:\n";
-     L1_cache.print_contents();
-    
-    // Final output and statistics
-    if (isL2Enabled) 
-    {
-        cout << "L2 Cache Contents:\n";
-        L2_cache.print_contents();
-    }
+    inp.close();
 
-    cout << "\nL1 Cache Statistics\n";
-    L1_cache.L1_print_statistics();    // L1 stats
+    // cout << "L1 Cache Contents:\n";
+    // L1_cache.print_contents();
 
-    if (isL2Enabled) 
-    {
-        cout << "\nL2 Cache Statistics\n";
-        L2_cache.L2_print_statistics();    // L2 stats
-    }
+    // // Final output and statistics
+    // if (isL2Enabled)
+    // {
+    //     cout << "L2 Cache Contents:\n";
+    //     L2_cache.print_contents();
+    // }
+
+    // cout << "\nL1 Cache Statistics\n";
+    // L1_cache.L1_print_statistics(); // L1 stats
+
+    // if (isL2Enabled)
+    // {
+    //     cout << "\nL2 Cache Statistics\n";
+    //     L2_cache.L2_print_statistics(); // L2 stats
+    // }
 
     //////////// MEMORY TRAFFIC CALCULATION ////////////
-    if(inclusionPolicy == 0 && isL2Enabled)
+    if (inclusionPolicy == 0 && isL2Enabled)
     {
         // non-inclusive, L2 enabled
         L2_cache.calculate_memory_traffic();
     }
-    else if(inclusionPolicy == 1 && isL2Enabled)
+    else if (inclusionPolicy == 1 && isL2Enabled)
     {
         // inclusive, L2 enabled
         total_memory_traffic = (L2_cache.calculate_inclusive_memory_traffic() + L1_cache.return_inclusive_writeback_counter());
         cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
     }
-    else if(inclusionPolicy == 0 && (!isL2Enabled))
+    else if (inclusionPolicy == 0 && (!isL2Enabled))
     {
         L1_cache.calculate_memory_traffic();
     }
-    else if(inclusionPolicy == 1 && (!isL2Enabled))
+    else if (inclusionPolicy == 1 && (!isL2Enabled))
     {
         L1_cache.calculate_memory_traffic();
     }
     //////////////////////////////////////////////////////
+}
 
+float Simulation::getL1MissRate()
+{
+    return L1_cache.gMissRate;
+}
+
+void Simulation::getL1Stats()
+{
+    L1_cache.L1_print_statistics();
 }
 
 #endif // SIMULATION_H
