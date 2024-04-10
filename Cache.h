@@ -55,6 +55,11 @@ public:
     unsigned long long getNumSets() const { return num_sets; }
     unsigned int getAssoc() const { return assoc; }
     unsigned int getBlockSize() const { return block_size; }
+    // Graph #2
+    long long getReadCount() {return reads_count;};
+    long long getWriteCount() {return writes_count;};
+    long long getReadMissCount() {return read_misses;};
+    long long getWriteMissCount() {return write_misses;};
 
     bool evict_block(int set_index, int block_index);
 

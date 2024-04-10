@@ -35,14 +35,18 @@ public:
     void run();
     float getL1MissRate();
     void getL1Stats();
+    long long getL1ReadCount();
+    long long getL1WriteCount();
+    long long getL1ReadMissCount();
+    long long getL1WriteMissCount();
 };
 
 void Simulation::run()
 {
-    std::cout << "Memory Hierarchy Configuration and Trace Filename:\n";
+    // std::cout << "Memory Hierarchy Configuration and Trace Filename:\n";
     // Configuration output
-    cout << "L1 Cache: " << L1_cache.getNumSets() * L1_cache.getAssoc() * L1_cache.getBlockSize() / 1024
-         << "KB " << L1_cache.getAssoc() << "-way, Block size: " << L1_cache.getBlockSize() << "B\n";
+    // cout << "L1 Cache: " << L1_cache.getNumSets() * L1_cache.getAssoc() * L1_cache.getBlockSize() / 1024
+    //      << "KB " << L1_cache.getAssoc() << "-way, Block size: " << L1_cache.getBlockSize() << "B\n";
 
     // Conditionally display L2 cache configuration based on whether it's enabled
 
@@ -222,7 +226,7 @@ void Simulation::run()
     {
         // inclusive, L2 enabled
         total_memory_traffic = (L2_cache.calculate_inclusive_memory_traffic() + L1_cache.return_inclusive_writeback_counter());
-        cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
+        // cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
     }
     else if (inclusionPolicy == 0 && (!isL2Enabled))
     {
@@ -240,9 +244,24 @@ float Simulation::getL1MissRate()
     return L1_cache.gMissRate;
 }
 
-void Simulation::getL1Stats()
+long long Simulation::getL1ReadCount()
 {
-    L1_cache.L1_print_statistics();
+    return L1_cache.getReadCount();
+}
+
+long long Simulation::getL1WriteCount()
+{
+    return L1_cache.getWriteCount();
+}
+
+long long Simulation::getL1ReadMissCount()
+{
+    return L1_cache.getReadMissCount();
+}
+
+long long Simulation::getL1WriteMissCount()
+{
+    return L1_cache.getWriteMissCount();
 }
 
 #endif // SIMULATION_H
