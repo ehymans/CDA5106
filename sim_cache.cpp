@@ -6,57 +6,135 @@
 const int BLOCK_SIZE = 32;
 const int MISS_PENALTY = 100; // 100ns for block size of 32
 
-string getGraph1Data (int (&assocArray)[5], int (&sizeArray)[11]) {
+string getGraph1Data(int (&assocArray)[5], int (&sizeArray)[11])
+{
     string data = "";
 
     for (int assoc : assocArray)
+    {
+        data.append(to_string(assoc).append("-way Associativity: (size,miss-rate)\n"));
+
+        for (int size : sizeArray)
         {
-            data.append(to_string(assoc).append("-way Associativity: (size,miss-rate)\n"));
+            Simulation sim(BLOCK_SIZE, size, assoc, 0, 0, 1, 0, "traces/gcc_trace.txt");
+            sim.run();
 
-            for (int size : sizeArray)
-            {
-                Simulation sim(BLOCK_SIZE, size, assoc, 0, 0, 1, 0, "traces/gcc_trace.txt");
-                sim.run();
-
-                data.append(to_string(int(log2(size))).append(",").append(to_string(sim.getL1MissRate())).append("\n"));
-
-            }
-
-            data.append("\n");
+            data.append(to_string((int)log2(size)).append(",").append(to_string(sim.getL1MissRate())).append("\n"));
         }
+
+        data.append("\n");
+    }
 
     return data;
 }
 
-string getGraph2Data (int (&assocArray)[5], int (&sizeArray)[11], float (&accessTimeArray)[5][11]) {
-    string dataArray[12][6] = {{"Log2(SIZE)","Direct Mapped","2-Way","4-Way","8-Way","Fully Associative"}};
+string getGraph2Data(int (&assocArray)[5], int (&sizeArray)[11], double (&accessTimeArray)[5][11])
+{
+    string dataArray[12][6] = {{"Log2(SIZE)", "Direct Mapped", "2-Way", "4-Way", "8-Way", "Fully Associative"}};
     string data = "";
 
     for (int i = 0; i < (sizeof(sizeArray) / sizeof(int)); i++)
+    {
+        dataArray[i + 1][0] = std::to_string((int)log2(sizeArray[i]));
+
+        for (int j = 0; j < (sizeof(assocArray) / sizeof(int)); j++)
         {
-            dataArray[i+1][0] = sizeArray[i];
+            Simulation sim(BLOCK_SIZE, sizeArray[i], assocArray[j], 0, 0, 1, 0, "traces/gcc_trace.txt");
+            sim.run();
 
-            for (int j = 0; j < (sizeof(assocArray) / sizeof(int)); j++)
-            {
-                Simulation sim(BLOCK_SIZE, sizeArray[i], assocArray[j], 0, 0, 1, 0, "traces/gcc_trace.txt");
-                sim.run();
+            double tat = (sim.getL1ReadCount() + sim.getL1WriteCount()) * accessTimeArray[i][j] + (sim.getL1ReadMissCount() + sim.getL1WriteMissCount()) * MISS_PENALTY;
+            double aat = tat / (sim.getL1ReadCount() + sim.getL1WriteCount());
 
-                float tat = (sim.getL1ReadCount() + sim.getL1WriteCount()) * accessTimeArray[i][j] + (sim.getL1ReadMissCount() + sim.getL1WriteMissCount()) * MISS_PENALTY;
-
-                // Graph #2
-                // TAT = (L1_reads + L1_writes) * accessTime + (L1_read_misses + L1_write_misses) * miss_penalty
-                dataArray[i+1][j+1] = std::to_string(tat);
-            }
-
-            // need to format contents of dataArray into csv-ready string
-            for (auto& row : dataArray) {
-                for (auto& elem : row) {
-                    data.append(elem).append(",");
-                }
-                data.append("\n");
-            }
-
+            // Graph #2
+            // TAT = (L1_reads + L1_writes) * accessTime + (L1_read_misses + L1_write_misses) * miss_penalty
+            dataArray[i + 1][j + 1] = std::to_string(aat);
         }
+    }
+
+    // need to format contents of dataArray into csv-ready string
+    for (auto &row : dataArray)
+    {
+        for (auto &elem : row)
+        {
+            data.append(elem).append(",");
+        }
+        data.append("\n");
+    }
+
+    return data;
+}
+
+string getGraph3Data(int (&sizeArray)[11], double (&accessTimeArray)[5][11])
+{
+    int replacement_policy_array[3] = {0, 1, 2};
+    string dataArray[12][4] = {{"Log2(SIZE)", "LRU", "FIFO", "Optimal"}};
+    string data = "";
+
+    for (int i = 0; i < (sizeof(sizeArray) / sizeof(int)); i++)
+    {
+        dataArray[i + 1][0] = std::to_string((int)log2(sizeArray[i]));
+
+        for (int j = 0; j < (sizeof(replacement_policy_array) / sizeof(int)); j++)
+        {
+            Simulation sim(BLOCK_SIZE, sizeArray[i], 4, 0, 0, replacement_policy_array[j], 0, "traces/gcc_trace.txt");
+            sim.run();
+
+            double tat = (sim.getL1ReadCount() + sim.getL1WriteCount()) * accessTimeArray[i][j] + (sim.getL1ReadMissCount() + sim.getL1WriteMissCount()) * MISS_PENALTY;
+            double aat = tat / (sim.getL1ReadCount() + sim.getL1WriteCount());
+
+            // Total Access Time (TAT) Equation
+            // TAT = (L1_reads + L1_writes) * accessTime + (L1_read_misses + L1_write_misses) * miss_penalty
+            dataArray[i + 1][j + 1] = std::to_string(aat);
+        }
+    }
+
+    // need to format contents of dataArray into csv-ready string
+    for (auto &row : dataArray)
+    {
+        for (auto &elem : row)
+        {
+            data.append(elem).append(",");
+        }
+        data.append("\n");
+    }
+
+    return data;
+}
+
+string getGraph4Data(double (&accessTimeArray)[5][11])
+{
+    int inclusion_policy_array[2] = {0, 1};
+    int localSizeArray[6] = {2048, 4096, 8192, 16384, 32768, 65536};
+    string dataArray[7][3] = {{"Log2(SIZE)", "Inclusive", "Non-Inclusive"}};
+    string data = "";
+
+    for (int i = 0; i < (sizeof(localSizeArray) / sizeof(int)); i++)
+    {
+        dataArray[i + 1][0] = std::to_string((int)log2(localSizeArray[i]));
+
+        for (int j = 0; j < (sizeof(inclusion_policy_array) / sizeof(int)); j++)
+        {
+            Simulation sim(BLOCK_SIZE, 1024, 4, localSizeArray[i], 8, 0, inclusion_policy_array[j], "traces/gcc_trace.txt");
+            sim.run();
+
+            double tat = (sim.getL1ReadCount() + sim.getL1WriteCount()) * accessTimeArray[i][j] + (sim.getL1ReadMissCount() + sim.getL1WriteMissCount()) * MISS_PENALTY;
+            double aat = tat / (sim.getL1ReadCount() + sim.getL1WriteCount());
+
+            // Total Access Time (TAT) Equation
+            // TAT = (L1_reads + L1_writes) * accessTime + (L1_read_misses + L1_write_misses) * miss_penalty
+            dataArray[i + 1][j + 1] = std::to_string(aat);
+        }
+    }
+
+    // need to format contents of dataArray into csv-ready string
+    for (auto &row : dataArray)
+    {
+        for (auto &elem : row)
+        {
+            data.append(elem).append(",");
+        }
+        data.append("\n");
+    }
 
     return data;
 }
@@ -86,7 +164,7 @@ int main(int argc, char *argv[])
         int assocArray[5] = {1, 2, 4, 8, BLOCK_SIZE};
         int sizeArray[11] = {1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576};
         // Access time based on Association x Size
-        float accessTimeArray[5][11] = {
+        double accessTimeArray[5][11] = {
             {0.114797, 0.12909, 0.147005, 0.16383, 0.198417, 0.233353, 0.294627, 0.3668, 0.443812, 0.563451, 0.69938},
             {0.140329, 0.161691, 0.181131, 0.194195, 0.223917, 0.262446, 0.300727, 0.374603, 0.445929, 0.567744, 0.706046},
             {0.14682, 0.154496, 0.185685, 0.211173, 0.233936, 0.27125, 0.319481, 0.38028, 0.457685, 0.564418, 0.699607},
@@ -95,7 +173,9 @@ int main(int argc, char *argv[])
         string data = "";
 
         // data = getGraph1Data(assocArray, sizeArray);
-        data = getGraph2Data(assocArray, sizeArray, accessTimeArray);
+        // data = getGraph2Data(assocArray, sizeArray, accessTimeArray);
+        // data = getGraph3Data(sizeArray, accessTimeArray);
+        data = getGraph4Data(accessTimeArray);
 
         cout << data << endl;
     }

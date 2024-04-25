@@ -56,10 +56,10 @@ public:
     unsigned int getAssoc() const { return assoc; }
     unsigned int getBlockSize() const { return block_size; }
     // Graph #2
-    long long getReadCount() {return reads_count;};
-    long long getWriteCount() {return writes_count;};
-    long long getReadMissCount() {return read_misses;};
-    long long getWriteMissCount() {return write_misses;};
+    long long getReadCount() { return reads_count; };
+    long long getWriteCount() { return writes_count; };
+    long long getReadMissCount() { return read_misses; };
+    long long getWriteMissCount() { return write_misses; };
 
     bool evict_block(int set_index, int block_index);
 
@@ -389,7 +389,7 @@ bool Cache::simulate_access(char op, long long address)
 void Cache::calculate_memory_traffic()
 {
     total_memory_traffic = (read_misses + write_misses + writebacks);
-    cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
+    // cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
 }
 
 int Cache::calculate_inclusive_memory_traffic()
