@@ -379,7 +379,7 @@ bool Cache::simulate_access(char op, long long address)
 void Cache::calculate_memory_traffic()
 {
     total_memory_traffic = (read_misses + write_misses + writebacks);
-    cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
+    cout << "m. total memory traffic: " << total_memory_traffic << "\n";
 }
 
 int Cache::calculate_inclusive_memory_traffic()
@@ -399,12 +399,13 @@ void Cache::L1_print_statistics()
     unsigned long long accesses = reads_count + writes_count;
     float miss_rate = accesses > 0 ? static_cast<float>(read_misses + write_misses) / accesses : 0;
 
-    cout << "Read operations: " << reads_count << "\n";
-    cout << "Read Misses: " << read_misses << "\n";
-    cout << "Write operations: " << writes_count << "\n";
-    cout << "Write Misses: " << write_misses << "\n";
-    cout << "Writebacks: " << writebacks << "\n";
-    cout << "Miss Rate: " << fixed << setprecision(4) << (accesses > 0 ? miss_rate * 100 : 0) << "%\n";
+    cout << "a. number of L1 reads: " << reads_count << "\n";
+    cout << "b. number of L1 read misses: " << read_misses << "\n";
+    cout << "c. number of L1 writes: " << writes_count << "\n";
+    cout << "d. number of L1 write misses: " << write_misses << "\n";
+    cout << "e. L1 miss rate: " << fixed << setprecision(6) << (accesses > 0 ? miss_rate : 0) << "\n";
+    cout << "f. number of L1 writebacks: " << writebacks << "\n";
+    
 }
 
 void Cache::L2_print_statistics()
@@ -413,24 +414,24 @@ void Cache::L2_print_statistics()
     unsigned long long accesses = reads_count + writes_count;
     float miss_rate = accesses > 0 ? static_cast<float>(read_misses + write_misses) / accesses : 0;
 
-    cout << "Read operations: " << reads_count << "\n";
-    cout << "Read Misses: " << read_misses << "\n";
-    cout << "Write operations: " << writes_count << "\n";
-    cout << "Write Misses: " << write_misses << "\n";
-    cout << "Writebacks: " << writebacks << "\n";
-    cout << "Miss Rate: " << (static_cast<float>(read_misses) / (reads_count)) * 100 << "%\n";      // this MR calculation is specific to L2.
+    cout << "g. number of L2 reads: " << reads_count << "\n";
+    cout << "h. number of L2 read misses: " << read_misses << "\n";
+    cout << "i. number of L2 writes: " << writes_count << "\n";
+    cout << "j. number of L2 write misses: " << write_misses << "\n";
+    cout << "k. L2 miss rate: " << (static_cast<float>(read_misses) / (reads_count)) << "\n";      // this MR calculation is specific to L2.
+    cout << "l. number of L2 writebacks: " << writebacks << "\n";
 }
 
 void Cache::print_contents()
 {
-    cout << "Final Cache Contents:\n";
+    //cout << "Final Cache Contents:\n";
     for (unsigned long long i = 0; i < num_sets; ++i)
     {
         cout << "Set " << i << ":";
         for (auto &line : sets[i].lines)
         {
             if (line.tag != -1)
-                cout << " [" << hex << line.tag << (line.dirty ? " D" : "") << "]";
+                cout << " " << hex << line.tag << (line.dirty ? " D" : "") << "";
             else
                 cout << " [Empty]";
         }

@@ -36,19 +36,47 @@ public:
 
 void Simulation::run() 
 {
-    std::cout << "Memory Hierarchy Configuration and Trace Filename:\n";
-    // Configuration output
-    cout << "L1 Cache: " << L1_cache.getNumSets() * L1_cache.getAssoc() * L1_cache.getBlockSize() / 1024 
-            << "KB " << L1_cache.getAssoc() << "-way, Block size: " << L1_cache.getBlockSize() << "B\n";
+    std::cout << "===== Simulator configuration =====\n";
+    std::cout << "BLOCKSIZE: " << L1_cache.getBlockSize() << "\n";
+    std::cout << "L1_SIZE: " << L1_cache.getNumSets() * L1_cache.getAssoc() * L1_cache.getBlockSize() << "\n";
+    std::cout << "L1_ASSOC: " << L1_cache.getAssoc() << "\n";
 
-    // Conditionally display L2 cache configuration based on whether it's enabled
-    
-    if (isL2Enabled) 
+    if (isL2Enabled)
     {
-        cout << "L2 Cache: " << L2_cache.getNumSets() * L2_cache.getAssoc() * L2_cache.getBlockSize() / 1024 
-                << "KB " << L2_cache.getAssoc() << "-way, Block size: " << L2_cache.getBlockSize() << "B\n";
-    } 
+        std::cout << "L2_SIZE: " << L2_cache.getNumSets() * L2_cache.getAssoc() * L2_cache.getBlockSize() << "\n";
+        std::cout << "L2_ASSOC: " << L2_cache.getAssoc() << "\n";
+    }
+    else
+    {
+        std::cout << "L2_SIZE: " << 0 << "\n";
+        std::cout << "L2_ASSOC: " << 0 << "\n";
+    }
 
+    // Print appropriate replacement policy
+    if (replacement_policy == 0)
+    {
+        std::cout << "REPLACEMENT POLICY: LRU\n";
+    }
+    else if (replacement_policy == 1)
+    {
+        std::cout << "REPLACEMENT POLICY: FIFO\n";
+    }
+    else if (replacement_policy == 2)
+    {
+        std::cout << "REPLACEMENT POLICY: OPTIMAL\n";
+    }
+    else
+    {
+        std::cerr << "Invalid replacement policy\n";
+        return;
+    }
+
+    std::cout << "INCLUSION PROPERTY: " << (inclusionPolicy == 0 ? "non-inclusive" : "inclusive") << "\n";
+
+    // Remove "traces/" from the start of the trace file name
+    string trace_file_name = trace_file.substr(7);
+
+    std::cout << "trace_file: " << trace_file_name << "\n";
     std::ifstream inp(trace_file);
     if (!inp) {
         std::cerr << "Error opening trace file\n";
@@ -188,23 +216,33 @@ void Simulation::run()
 
     inp.close();   
       
-     cout << "L1 Cache Contents:\n";
+     cout << "===== L1 contents =====\n";
      L1_cache.print_contents();
-    
+
+
     // Final output and statistics
     if (isL2Enabled) 
     {
-        cout << "L2 Cache Contents:\n";
+        cout << "===== L2 contents =====\n";
         L2_cache.print_contents();
     }
 
-    cout << "\nL1 Cache Statistics\n";
+    cout << "\n===== Simulation results (raw) =====\n";
     L1_cache.L1_print_statistics();    // L1 stats
 
     if (isL2Enabled) 
     {
-        cout << "\nL2 Cache Statistics\n";
         L2_cache.L2_print_statistics();    // L2 stats
+    }
+    else
+    {
+        // Print zero values for L2 statistics when L2 is not enabled
+        cout << "g. number of L2 reads: 0\n";
+        cout << "h. number of L2 read misses: 0\n";
+        cout << "i. number of L2 writes: 0\n";
+        cout << "j. number of L2 write misses: 0\n";
+        cout << "l. number of L2 writebacks: 0\n";
+        cout << "k. L2 miss rate: 0\n";
     }
 
     //////////// MEMORY TRAFFIC CALCULATION ////////////
@@ -217,7 +255,7 @@ void Simulation::run()
     {
         // inclusive, L2 enabled
         total_memory_traffic = (L2_cache.calculate_inclusive_memory_traffic() + L1_cache.return_inclusive_writeback_counter());
-        cout << "Total Memory Traffic: " << total_memory_traffic << "\n";
+        cout << "m. total memory traffic: " << total_memory_traffic << "\n";
     }
     else if(inclusionPolicy == 0 && (!isL2Enabled))
     {
